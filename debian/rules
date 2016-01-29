@@ -1,100 +1,53 @@
 #!/usr/bin/make -f
-# Sample debian/rules that uses debhelper.
-# This file is public domain software, originally written by Joey Hess. 
-#
-# This version is for packages that are architecture dependent.
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+SHELL=/bin/sh -e
 
-DEB_SRCDIR=$(shell pwd)
-INSTALL_DIR=$(DEB_SRCDIR)/debian/$(shell dh_listpackages)
-EXTENSION_DIR=`php-config5 --extension-dir`
-CFLAGS = -O3
+PECL_NAME    := $(shell dpkg-parsechangelog -SSource | sed -e s/php-//)
+INSTALL_ROOT := $(CURDIR)/debian/php7.0-$(PECL_NAME)
 
+PHP_VERSIONS := $(shell /usr/sbin/phpquery -V)
 
-build: build-stamp
-build-stamp:
-	dh_testdir
+CONFIGURE_TARGETS := $(addprefix configure-,$(addsuffix -stamp,$(PHP_VERSIONS)))
+BUILD_TARGETS     := $(addprefix build-,$(addsuffix -stamp,$(PHP_VERSIONS)))
+INSTALL_TARGETS   := $(addprefix install-,$(addsuffix -stamp,$(PHP_VERSIONS)))
+CLEAN_TARGETS     := $(addprefix clean-,$(addsuffix -stamp,$(PHP_VERSIONS)))
 
-	# Add here commands to compile the package.
-	
-	# Because phpize --clean removes all testfiles
-	# in tests/*.php the svn-buildpackage will fail
-	# when tests/TestRedis.php was removed.
-	# So we backup the file:
-	cd $(DEB_SRCDIR) && mv tests/TestRedis.php tests/TestRedis.php.bak && \
-		phpize --clean && mv tests/TestRedis.php.bak tests/TestRedis.php && \
-	        phpize && \
-		./configure --with-php-config=/usr/bin/php-config5
-	$(MAKE) -C $(DEB_SRCDIR)
+%:
+	dh $@ --with php
 
-	touch build-stamp
+override_dh_auto_configure: $(CONFIGURE_TARGETS)
+override_dh_auto_build: $(BUILD_TARGETS)
+override_dh_auto_install: $(INSTALL_TARGETS)
 
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-stamp
+override_dh_auto_clean: $(CLEAN_TARGETS)
+	-rm $(CONFIGURE_TARGETS) $(BUILD_TARGETS) $(INSTALL_TARGETS) $(CLEAN_TARGETS)
 
-	# Add here commands to clean up after the build process.
-	# See comment in build-stamp why doing the 'mv'
-	cd $(DEB_SRCDIR) && mv tests/TestRedis.php tests/TestRedis.php.bak && \
-		phpize --clean && mv tests/TestRedis.php.bak tests/TestRedis.php
-	#$(MAKE) -C $(DEB_SRCDIR) clean
-	#$(MAKE) distclean
+#configure-%-stamp: SOURCE_DIR = $(shell ls -1d php-$*/$(PECL_NAME)-*)
+configure-%-stamp: SOURCE_DIR = .
+configure-%-stamp:
+	cd $(SOURCE_DIR) && phpize$*
+	dh_auto_configure --sourcedirectory=$(SOURCE_DIR) -- \
+		--with-php-config=/usr/bin/php-config$* \
+		--enable-$(PECL_NAME) \
+		--enable-redis-igbinary
+	touch configure-$*-stamp
 
-	dh_clean
+#build-%-stamp: SOURCE_DIR = $(shell ls -1d php-$*/$(PECL_NAME)-*)
+build-%-stamp: SOURCE_DIR = .
+build-%-stamp:
+	dh_auto_build --sourcedirectory=$(SOURCE_DIR)
+	touch build-$*-stamp
 
-install: build
-	dh_testdir
-	dh_testroot
-	dh_prep
-	dh_installdirs
+#install-%-stamp: SOURCE_DIR = $(shell ls -1d php-$*/$(PECL_NAME)-*)
+install-%-stamp: SOURCE_DIR = .
+install-%-stamp:
+	dh_auto_install --sourcedirectory=$(SOURCE_DIR) -- INSTALL_ROOT=$(INSTALL_ROOT)
+	touch install-$*-stamp
 
-	# Add here commands to install the package into debian/<packagename>
-	$(MAKE) prefix=$(INSTALL_DIR)/usr EXTENSION_DIR=$(INSTALL_DIR)$(EXTENSION_DIR) install
-
-# Build architecture-independent files here.
-binary-indep: build install
-# We have nothing to do by default.
-
-# Build architecture-dependent files here.
-binary-arch: build install
-	dh_testdir
-	dh_testroot
-	dh_installchangelogs
-	dh_installdocs
-	dh_installexamples
-#	dh_install
-#	dh_installmenu
-#	dh_installdebconf	
-#	dh_installlogrotate
-#	dh_installemacsen
-#	dh_installcatalogs
-#	dh_installpam
-#	dh_installmime
-#	dh_installinit
-#	dh_installcron
-#	dh_installinfo
-#	dh_installwm
-#	dh_installudev
-#	dh_lintian
-#	dh_bugfiles
-#	dh_undocumented
-	dh_installman
-	dh_link
-	dh_strip
-	dh_compress
-	dh_fixperms
-#	dh_perl
-#	dh_makeshlibs
-	dh_installdeb
-	dh_shlibdeps
-	cd $(DEB_SRCDIR) && \
-	       echo "php5:Depends=phpapi-`php-config5 --phpapi`, php5-common" >> debian/phpredis.substvars
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
-
-binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install
+#clean-%-stamp: SOURCE_DIR = $(shell ls -1d php-$*/$(PECL_NAME)-*)
+clean-%-stamp: SOURCE_DIR = .
+clean-%-stamp:
+	cd $(SOURCE_DIR) && phpize$* --clean
+	#dh_auto_clean --sourcedirectory=$(SOURCEDIR)
+	dh_auto_clean
+	touch clean-$*-stamp

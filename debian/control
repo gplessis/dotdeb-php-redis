@@ -1,16 +1,19 @@
-Source: php5-redis
-Section: web
+Source: php-redis
+Section: php
 Priority: optional
-Maintainer: Nicolas Favre-Felix <n.favre-felix@owlient.eu>
-Build-Depends: debhelper (>= 7), php5-dev
-Standards-Version: 3.8.0
-Homepage: https://github.com/nicolasff/phpredis
+Maintainer: Guillaume Plessis <gui@dotdeb.org>
+Build-Depends: debhelper (>= 9),
+	       php7.0-dev,
+	       dh-php,
+	       php7.0-igbinary
+Standards-Version: 3.9.6
+Homepage: http://pecl.php.net/package/redis
 
-Package: php5-redis
+Package: php7.0-redis
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${php5:Depends}
-Recommends: php5
-Provides: php5-redis
-Conflicts: phpredis
-Replaces: phpredis
-Description: Redis C extension for PHP5.
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${php:Depends}
+Suggests: redis-server
+Description: PHP extension for interfacing with Redis
+ This extension allows php applications to communicate with the Redis
+ persistent key-value store. The php-redis module provides an easy
+ object oriented interface.
