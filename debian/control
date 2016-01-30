@@ -11,7 +11,7 @@ Homepage: http://pecl.php.net/package/redis
 
 Package: php7.0-redis
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${php:Depends}
+Depends: php7.0-igbinary, ${shlibs:Depends}, ${misc:Depends}, ${php:Depends}
 Suggests: redis-server
 Description: PHP extension for interfacing with Redis
  This extension allows php applications to communicate with the Redis
