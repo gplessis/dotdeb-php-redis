@@ -998,7 +998,7 @@ int redis_key_varval_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
     for(i=1;i<argc;i++) {
         arg_free = redis_serialize(redis_sock, &z_args[i], &arg, &arg_len TSRMLS_CC);
         redis_cmd_append_sstr(&cmdstr, arg, arg_len);
-        //if(arg_free) efree(arg);
+        if (arg_free) efree(arg);
     }
 
     // Push out values
@@ -2657,13 +2657,11 @@ int redis_zadd_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
 
     // Now the rest of our arguments
     for(i=1;i<argc;i+=2) {
-        // Convert score to a double, serialize value if requested
-        convert_to_double(&z_args[i]);
         val_free = redis_serialize(redis_sock, &z_args[i+1], &val, &val_len
             TSRMLS_CC);
 
         // Append score and member
-        redis_cmd_append_sstr_dbl(&cmdstr, Z_DVAL(z_args[i]));
+        redis_cmd_append_sstr_dbl(&cmdstr, zval_get_double(&z_args[i]));
         redis_cmd_append_sstr(&cmdstr, val, val_len);
 
         // Free value if we serialized
@@ -2769,7 +2767,7 @@ int redis_sinterstore_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
                           char **cmd, int *cmd_len, short *slot, void **ctx)
 {
     return gen_varkey_cmd(INTERNAL_FUNCTION_PARAM_PASSTHRU, redis_sock,
-        "SINTERSTORE", sizeof("SINTERSTORE")-1, 2, 0, cmd, cmd_len, slot);
+        "SINTERSTORE", sizeof("SINTERSTORE")-1, 1, 0, cmd, cmd_len, slot);
 }
 
 /* SUNION */
@@ -2801,7 +2799,7 @@ int redis_sdiffstore_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
                          char **cmd, int *cmd_len, short *slot, void **ctx)
 {
     return gen_varkey_cmd(INTERNAL_FUNCTION_PARAM_PASSTHRU, redis_sock,
-        "SDIFFSTORE", sizeof("SDIFFSTORE")-1, 2, 0, cmd, cmd_len, slot);
+        "SDIFFSTORE", sizeof("SDIFFSTORE")-1, 1, 0, cmd, cmd_len, slot);
 }
 
 /* COMMAND */
