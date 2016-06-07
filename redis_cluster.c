@@ -502,8 +502,6 @@ distcmd_resp_handler(INTERNAL_FUNCTION_PARAMETERS, redisCluster *c, short slot,
        c->err!=NULL)
     {
         cluster_multi_free(mc);
-        zval_dtor(z_ret);
-        efree(z_ret);
         efree(ctx);
         return -1;
     }
@@ -641,7 +639,7 @@ static int cluster_mkey_cmd(INTERNAL_FUNCTION_PARAMETERS, char *kw, int kw_len,
     if (!argc) return -1;
 
     /* Extract our arguments into an array */
-    z_args = emalloc(sizeof(zval*)*argc);
+    z_args = emalloc(sizeof(*z_args) * argc);
     if (zend_get_parameters_array(ht, ZEND_NUM_ARGS(), z_args) == FAILURE) {
         efree(z_args);
         return -1;
@@ -857,7 +855,7 @@ PHP_METHOD(RedisCluster, del) {
     // Initialize a LONG value to zero for our return
     z_ret = emalloc(sizeof(*z_ret));
     ZVAL_LONG(z_ret, 0);
-
+    
     // Parse args, process
     if(cluster_mkey_cmd(INTERNAL_FUNCTION_PARAM_PASSTHRU, "DEL",
                         sizeof("DEL")-1, z_ret, cluster_del_resp)<0)
@@ -906,16 +904,18 @@ PHP_METHOD(RedisCluster, mset) {
 
 /* {{{ proto array RedisCluster::msetnx(array keyvalues) */
 PHP_METHOD(RedisCluster, msetnx) {
-    zval z_ret;
+    zval *z_ret;
 
     // Array response
-    array_init(&z_ret);
+    z_ret = emalloc(sizeof(*z_ret));
+    array_init(z_ret);
 
     // Parse args and process.  If we get a failure, free mem and return FALSE
     if(cluster_mset_cmd(INTERNAL_FUNCTION_PARAM_PASSTHRU, "MSETNX",
-                        sizeof("MSETNX")-1, &z_ret, cluster_msetnx_resp)==-1)
+                        sizeof("MSETNX")-1, z_ret, cluster_msetnx_resp)==-1)
     {
-        zval_dtor(&z_ret);
+        zval_dtor(z_ret);
+        efree(z_ret);
         RETURN_FALSE;
     }
 }
@@ -2067,7 +2067,7 @@ PHP_METHOD(RedisCluster, watch) {
     ht_dist = cluster_dist_create();
 
     // Allocate args, and grab them
-    z_args = emalloc(sizeof(zval*)*argc);
+    z_args = emalloc(sizeof(*z_args) * argc);
     if(zend_get_parameters_array(ht, argc, z_args)==FAILURE) {
         efree(z_args);
         cluster_dist_free(ht_dist);
@@ -2339,10 +2339,8 @@ static void cluster_raw_cmd(INTERNAL_FUNCTION_PARAMETERS, char *kw, int kw_len)
         RETURN_FALSE;
     }
 
-    /* Allocate an array to process arguments */
-    z_args = emalloc(argc * sizeof(zval*));
-
     /* Grab args */
+    z_args = emalloc(sizeof(*z_args) * argc);
     if(zend_get_parameters_array(ht, argc, z_args)==FAILURE) {
         efree(z_args);
         RETURN_FALSE;
@@ -2390,7 +2388,7 @@ static void cluster_kscan_cmd(INTERNAL_FUNCTION_PARAMETERS,
     zval *z_it;
     HashTable *hash;
     long it, num_ele;
-    zend_long count;
+    zend_long count=0;
 
     // Can't be in MULTI mode
     if(!CLUSTER_IS_ATOMIC(c)) {

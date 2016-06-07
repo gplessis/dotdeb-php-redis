@@ -10,6 +10,7 @@
 #endif
 #include <ext/standard/php_smart_string.h>
 #include <ext/standard/php_var.h>
+#include <zend_smart_str.h>
 #ifdef HAVE_REDIS_IGBINARY
 #include "igbinary/igbinary.h"
 #endif
@@ -1562,6 +1563,7 @@ PHP_REDIS_API int redis_sock_connect(RedisSock *redis_sock TSRMLS_DC)
     struct timeval tv, read_tv, *tv_ptr = NULL;
     char *host = NULL, *persistent_id = NULL;
 	zend_string *errstr;
+    const char *fmtstr = "%s:%d";
     int host_len, err = 0;
     php_netstream_data_t *sock;
     int tcp_flag = 1;
@@ -1584,8 +1586,15 @@ PHP_REDIS_API int redis_sock_connect(RedisSock *redis_sock TSRMLS_DC)
     } else {
         if(redis_sock->port == 0)
             redis_sock->port = 6379;
-        host_len = spprintf(&host, 0, "%s:%d", redis_sock->host,
-            redis_sock->port);
+
+#ifdef HAVE_IPV6
+        /* If we've got IPv6 and find a colon in our address, convert to proper
+         * IPv6 [host]:port format */
+        if (strchr(redis_sock->host, ':') != NULL) {
+            fmtstr = "[%s]:%d";
+        }
+#endif
+        host_len = spprintf(&host, 0, fmtstr, redis_sock->host, redis_sock->port);
     }
 
     if (redis_sock->persistent) {
@@ -1707,10 +1716,9 @@ PHP_REDIS_API void redis_send_discard(INTERNAL_FUNCTION_PARAMETERS,
         RETURN_FALSE;
     }
 
-    if(response_len == 3 && strncmp(response, "+OK", 3) == 0) {
-        RETURN_TRUE;
-    }
-    RETURN_FALSE;
+    RETVAL_BOOL(response_len == 3 && strncmp(response, "+OK", 3) == 0);
+
+    efree(response);
 }
 
 /**
@@ -1840,9 +1848,8 @@ PHP_REDIS_API int redis_mbulk_reply_raw(INTERNAL_FUNCTION_PARAMETERS, RedisSock 
     IF_MULTI_OR_PIPELINE() {
         add_next_index_zval(z_tab, &z_multi_result);
     } else {
-		ZVAL_DUP(return_value, &z_multi_result);
+        ZVAL_COPY_VALUE(return_value, &z_multi_result);
     }
-    /*zval_copy_ctor(return_value); */
     return 0;
 }
 
@@ -1920,11 +1927,11 @@ PHP_REDIS_API int redis_mbulk_reply_assoc(INTERNAL_FUNCTION_PARAMETERS, RedisSoc
         if(response != NULL) {
             zval z;
             if(redis_unserialize(redis_sock, response, response_len, &z) == 1) {
-                efree(response);
                 add_assoc_zval_ex(&z_multi_result, Z_STRVAL(z_keys[i]), Z_STRLEN(z_keys[i]), &z);
             } else {
                 add_assoc_stringl_ex(&z_multi_result, Z_STRVAL(z_keys[i]), Z_STRLEN(z_keys[i]), response, response_len);
             }
+            efree(response);
         } else {
             add_assoc_bool_ex(&z_multi_result, Z_STRVAL(z_keys[i]), Z_STRLEN(z_keys[i]), 0);
         }
@@ -2019,19 +2026,20 @@ redis_serialize(RedisSock *redis_sock, zval *z, char **val, size_t *val_len
 
             /* return string */
             convert_to_string(&z_copy);
-            *val = Z_STRVAL_P(&z_copy);
+            *val = estrndup(Z_STRVAL_P(&z_copy), Z_STRLEN_P(&z_copy));
             *val_len = Z_STRLEN_P(&z_copy);
-            return 0;
+            zval_ptr_dtor(&z_copy);
+            return 1;
 
         case REDIS_SERIALIZER_PHP:
-
             PHP_VAR_SERIALIZE_INIT(ht);
             php_var_serialize(&sstr, z, &ht TSRMLS_CC);
-            *val = sstr.s->val;
+            *val = estrndup(sstr.s->val, sstr.s->len);
             *val_len = sstr.s->len;
+            smart_str_free(&sstr);
             PHP_VAR_SERIALIZE_DESTROY(ht);
 
-            return 0;
+            return 1;
 
         case REDIS_SERIALIZER_IGBINARY:
 #ifdef HAVE_REDIS_IGBINARY
@@ -2223,6 +2231,7 @@ redis_read_variant_bulk(RedisSock *redis_sock, int size, zval **z_ret
 		return -1;
 	} else {
 		ZVAL_STRINGL(*z_ret, bulk_resp, size);
+		efree(bulk_resp);
 		return 0;
 	}
 }
