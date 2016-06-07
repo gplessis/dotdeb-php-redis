@@ -33,7 +33,7 @@ RUN mk-build-deps --install --tool 'apt-get -y' --remove /root/control && rm -f 
 ADD . /usr/src/builddir
 WORKDIR /usr/src/builddir
 
-RUN curl -Lo /usr/src/php-redis_2.2.7-1~7b36957.orig.tar.gz https://github.com/phpredis/phpredis/archive/7b3695768213910c9ce5535edd15785118848ca7.tar.gz
+RUN curl -Lo /usr/src/php-redis_3.0.0~rc1.orig.tar.gz https://github.com/phpredis/phpredis/archive/3.0.0-rc1.tar.gz
 #RUN uscan --download-current-version
 RUN dpkg-buildpackage
 
