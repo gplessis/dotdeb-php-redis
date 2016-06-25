@@ -48,6 +48,6 @@ install-%-stamp:
 clean-%-stamp: SOURCE_DIR = .
 clean-%-stamp:
 	cd $(SOURCE_DIR) && phpize$* --clean
-	#dh_auto_clean --sourcedirectory=$(SOURCEDIR)
+	#dh_auto_clean --sourcedirectory=$(SOURCE_DIR)
 	dh_auto_clean
 	touch clean-$*-stamp
