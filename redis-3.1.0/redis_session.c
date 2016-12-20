@@ -27,12 +27,10 @@
 #endif
 
 #ifdef PHP_SESSION
-#include "common.h"
 #include "ext/standard/info.h"
 #include "php_redis.h"
 #include "redis_session.h"
 #include <zend_exceptions.h>
-#include "ext/session/php_session.h"
 
 #include "library.h"
 #include "cluster_library.h"
@@ -43,6 +41,12 @@
 #include "SAPI.h"
 #include "ext/standard/url.h"
 
+ps_module ps_mod_redis = {
+    PS_MOD(redis)
+};
+ps_module ps_mod_redis_cluster = {
+    PS_MOD(rediscluster)
+};
 
 typedef struct redis_pool_member_ {
 
@@ -157,7 +161,7 @@ redis_pool_get_sock(redis_pool *pool, const char *key TSRMLS_DC) {
 
     redis_pool_member *rpm = pool->head;
 
-    for(i = 0; i < (unsigned int)pool->totalWeight;) {
+    for(i = 0; i < pool->totalWeight;) {
         if(pos >= i && pos < i + rpm->weight) {
             int needs_auth = 0;
             if(rpm->auth && rpm->auth_len && rpm->redis_sock->status != REDIS_SOCK_STATUS_CONNECTED) {
@@ -237,13 +241,12 @@ PS_OPEN_FUNC(redis)
                 sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params TSRMLS_CC);
 
                 if ((param = zend_hash_str_find(Z_ARRVAL(params), "weight", sizeof("weight") - 1)) != NULL) {
-                    convert_to_long_ex(param);
-                    weight = Z_LVAL_P(param);
+                    weight = zval_get_long(param);
                 }
                 if ((param = zend_hash_str_find(Z_ARRVAL(params), "timeout", sizeof("timeout") - 1)) != NULL) {
                     timeout = atof(Z_STRVAL_P(param));
                 }
-                if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent") -1 )) != NULL) {
+                if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent") - 1)) != NULL) {
                     persistent = (atol(Z_STRVAL_P(param)) == 1 ? 1 : 0);
                 }
                 if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent_id", sizeof("persistent_id") - 1)) != NULL) {
@@ -255,20 +258,21 @@ PS_OPEN_FUNC(redis)
                 if ((param = zend_hash_str_find(Z_ARRVAL(params), "auth", sizeof("auth") - 1)) != NULL) {
                     auth = estrndup(Z_STRVAL_P(param), Z_STRLEN_P(param));
                 }
-                if ((param = zend_hash_str_find(Z_ARRVAL(params), "database", sizeof("database") -1 )) != NULL) {
-                    convert_to_long_ex(param);
-                    database = Z_LVAL_P(param);
+                if ((param = zend_hash_str_find(Z_ARRVAL(params), "database", sizeof("database") - 1)) != NULL) {
+                    database = zval_get_long(param);
                 }
                 if ((param = zend_hash_str_find(Z_ARRVAL(params), "retry_interval", sizeof("retry_interval") - 1)) != NULL) {
-                    convert_to_long_ex(param);
-                    retry_interval = Z_LVAL_P(param);
+                    retry_interval = zval_get_long(param);
                 }
 
-                zval_ptr_dtor(&params);
+                zval_dtor(&params);
             }
 
             if ((url->path == NULL && url->host == NULL) || weight <= 0 || timeout <= 0) {
                 php_url_free(url);
+                if (persistent_id) efree(persistent_id);
+                if (prefix) efree(prefix);
+                if (auth) efree(auth);
                 redis_pool_free(pool TSRMLS_CC);
                 PS_SET_MOD_DATA(NULL);
                 return FAILURE;
@@ -335,40 +339,47 @@ redis_session_key(redis_pool_member *rpm, const char *key, int key_len, int *ses
  */
 PS_READ_FUNC(redis)
 {
-    char *session, *cmd;
-    int session_len, cmd_len;
-    char *char_val;
-    int int_val = 0;
+    char *resp, *cmd;
+    int resp_len, cmd_len;
 
     redis_pool *pool = PS_GET_MOD_DATA();
-    redis_pool_member *rpm = redis_pool_get_sock(pool, key->val);
+#if (PHP_MAJOR_VERSION < 7)
+    redis_pool_member *rpm = redis_pool_get_sock(pool, key TSRMLS_CC);
+#else
+    redis_pool_member *rpm = redis_pool_get_sock(pool, key->val TSRMLS_CC);
+#endif
     RedisSock *redis_sock = rpm?rpm->redis_sock:NULL;
     if(!rpm || !redis_sock){
         return FAILURE;
     }
 
     /* send GET command */
-    session = redis_session_key(rpm, key->val, key->len, &session_len);
-    cmd_len = redis_cmd_format_static(&cmd, "GET", "s", session, session_len);
-
-    efree(session);
+#if (PHP_MAJOR_VERSION < 7)
+    resp = redis_session_key(rpm, key, strlen(key), &resp_len);
+#else
+    resp = redis_session_key(rpm, key->val, key->len, &resp_len);
+#endif
+    cmd_len = redis_cmd_format_static(&cmd, "GET", "s", resp, resp_len);
+    
+    efree(resp);
     if(redis_sock_write(redis_sock, cmd, cmd_len TSRMLS_CC) < 0) {
         efree(cmd);
         return FAILURE;
     }
     efree(cmd);
 
-    /* Read response from Redis.  If we get a NULL response from redis_sock_read
-     * this can indicate an error, OR a "NULL bulk" reply (empty session data)
-     * in which case we can reply with success. */
-    if ((char_val = redis_sock_read(redis_sock, &int_val)) == NULL && int_val != -1) 
-    {
+    /* read response */
+    if ((resp = redis_sock_read(redis_sock, &resp_len TSRMLS_CC)) == NULL) {
         return FAILURE;
     }
-    
-    *val = zend_string_init(char_val, int_val == -1 ? 0 : int_val, 0);
-    if (char_val) efree(char_val);
-    
+#if (PHP_MAJOR_VERSION < 7)
+    *val = resp;
+    *vallen = resp_len;
+#else
+    *val = zend_string_init(resp, resp_len, 0);
+    efree(resp);
+#endif
+
     return SUCCESS;
 }
 /* }}} */
@@ -381,18 +392,24 @@ PS_WRITE_FUNC(redis)
     int cmd_len, response_len, session_len;
 
     redis_pool *pool = PS_GET_MOD_DATA();
+#if (PHP_MAJOR_VERSION < 7)
+    redis_pool_member *rpm = redis_pool_get_sock(pool, key TSRMLS_CC);
+#else
     redis_pool_member *rpm = redis_pool_get_sock(pool, key->val TSRMLS_CC);
+#endif
     RedisSock *redis_sock = rpm?rpm->redis_sock:NULL;
     if(!rpm || !redis_sock){
         return FAILURE;
     }
 
     /* send SET command */
+#if (PHP_MAJOR_VERSION < 7)
+    session = redis_session_key(rpm, key, strlen(key), &session_len);
+    cmd_len = redis_cmd_format_static(&cmd, "SETEX", "sds", session, session_len, INI_INT("session.gc_maxlifetime"), val, vallen);
+#else
     session = redis_session_key(rpm, key->val, key->len, &session_len);
-    cmd_len = redis_cmd_format_static(&cmd, "SETEX", "sds", session,
-                                      session_len,
-                                      INI_INT("session.gc_maxlifetime"),
-                                      val->val, val->len);
+    cmd_len = redis_cmd_format_static(&cmd, "SETEX", "sds", session, session_len, INI_INT("session.gc_maxlifetime"), val->val, val->len);
+#endif
     efree(session);
     if(redis_sock_write(redis_sock, cmd, cmd_len TSRMLS_CC) < 0) {
         efree(cmd);
@@ -423,14 +440,22 @@ PS_DESTROY_FUNC(redis)
     int cmd_len, response_len, session_len;
 
     redis_pool *pool = PS_GET_MOD_DATA();
+#if (PHP_MAJOR_VERSION < 7)
+    redis_pool_member *rpm = redis_pool_get_sock(pool, key TSRMLS_CC);
+#else
     redis_pool_member *rpm = redis_pool_get_sock(pool, key->val TSRMLS_CC);
+#endif
     RedisSock *redis_sock = rpm?rpm->redis_sock:NULL;
     if(!rpm || !redis_sock){
         return FAILURE;
     }
 
     /* send DEL command */
+#if (PHP_MAJOR_VERSION < 7)
+    session = redis_session_key(rpm, key, strlen(key), &session_len);
+#else
     session = redis_session_key(rpm, key->val, key->len, &session_len);
+#endif
     cmd_len = redis_cmd_format_static(&cmd, "DEL", "s", session, session_len);
     efree(session);
     if(redis_sock_write(redis_sock, cmd, cmd_len TSRMLS_CC) < 0) {
@@ -472,15 +497,15 @@ static void session_conf_timeout(HashTable *ht_conf, const char *key, int key_le
 {
     zval *z_val;
 
-    if ((z_val = zend_hash_str_find(ht_conf, key, key_len)) != NULL &&
-        Z_TYPE_P(z_val) == IS_STRING)
-    {
+    if ((z_val = zend_hash_str_find(ht_conf, key, key_len - 1)) != NULL &&
+        Z_TYPE_P(z_val) == IS_STRING
+    ) {
         *val = atof(Z_STRVAL_P(z_val));
     }
 }
 
 /* Simple helper to retreive a boolean (0 or 1) value from a string stored in our
- * session.save_path variable.  This is so the user can use 0, 1, or 'true',
+ * session.save_path variable.  This is so the user can use 0, 1, or 'true', 
  * 'false' */
 static void session_conf_bool(HashTable *ht_conf, char *key, int keylen,
                               int *retval) {
@@ -488,10 +513,10 @@ static void session_conf_bool(HashTable *ht_conf, char *key, int keylen,
     char *str;
     int strlen;
 
-    /* See if we have the option, and it's a string */
-    if ((z_val = zend_hash_str_find(ht_conf, key, keylen)) != NULL &&
-        Z_TYPE_P(z_val) == IS_STRING)
-    {
+    /* See if we have the option, and it's a string */   
+    if ((z_val = zend_hash_str_find(ht_conf, key, keylen - 1)) != NULL &&
+        Z_TYPE_P(z_val) == IS_STRING
+    ) {
         str = Z_STRVAL_P(z_val);
         strlen = Z_STRLEN_P(z_val);
 
@@ -503,7 +528,7 @@ static void session_conf_bool(HashTable *ht_conf, char *key, int keylen,
 }
 
 /* Prefix a session key */
-static char *cluster_session_key(redisCluster *c, const char *key, int keylen,
+static char *cluster_session_key(redisCluster *c, const char *key, int keylen, 
                                  int *skeylen, short *slot) {
     char *skey;
 
@@ -511,7 +536,7 @@ static char *cluster_session_key(redisCluster *c, const char *key, int keylen,
     skey = emalloc(*skeylen);
     memcpy(skey, c->flags->prefix, c->flags->prefix_len);
     memcpy(skey + c->flags->prefix_len, key, keylen);
-
+    
     *slot = cluster_hash_key(skey, *skeylen);
 
     return skey;
@@ -549,7 +574,7 @@ PS_OPEN_FUNC(rediscluster) {
 
     /* Grab persistent option */
     session_conf_bool(ht_conf, "persistent", sizeof("persistent"), &persistent);
-
+    
     /* Sanity check on our timeouts */
     if (timeout < 0 || read_timeout < 0) {
         php_error_docref(NULL TSRMLS_CC, E_WARNING,
@@ -559,9 +584,9 @@ PS_OPEN_FUNC(rediscluster) {
     }
 
     /* Look for a specific prefix */
-    if ((z_val = zend_hash_str_find(ht_conf, "prefix", sizeof("prefix") - 1 )) != NULL &&
-        Z_TYPE_P(z_val) == IS_STRING && Z_STRLEN_P(z_val) > 0)
-    {
+    if ((z_val = zend_hash_str_find(ht_conf, "prefix", sizeof("prefix") - 1)) != NULL &&
+        Z_TYPE_P(z_val) == IS_STRING && Z_STRLEN_P(z_val) > 0
+    ) {
         prefix = Z_STRVAL_P(z_val);
         prefix_len = Z_STRLEN_P(z_val);
     } else {
@@ -571,8 +596,8 @@ PS_OPEN_FUNC(rediscluster) {
 
     /* Look for a specific failover setting */
     if ((z_val = zend_hash_str_find(ht_conf, "failover", sizeof("failover") - 1)) != NULL &&
-        Z_TYPE_P(z_val) == IS_STRING)
-    {
+        Z_TYPE_P(z_val) == IS_STRING
+    ) {
         if (!strcasecmp(Z_STRVAL_P(z_val), "error")) {
             failover = REDIS_FAILOVER_ERROR;
         } else if (!strcasecmp(Z_STRVAL_P(z_val), "distribute")) {
@@ -595,7 +620,7 @@ PS_OPEN_FUNC(rediscluster) {
 
     /* Cleanup */
     zval_dtor(&z_conf);
-
+    
     return retval;
 }
 
@@ -609,7 +634,11 @@ PS_READ_FUNC(rediscluster) {
     short slot;
 
     /* Set up our command and slot information */
+#if (PHP_MAJOR_VERSION < 7)
+    skey = cluster_session_key(c, key, strlen(key), &skeylen, &slot);
+#else
     skey = cluster_session_key(c, key->val, key->len, &skeylen, &slot);
+#endif
     cmdlen = redis_cmd_format_static(&cmd, "GET", "s", skey, skeylen);
     efree(skey);
 
@@ -631,7 +660,12 @@ PS_READ_FUNC(rediscluster) {
     }
 
     /* Push reply value to caller */
+#if (PHP_MAJOR_VERSION < 7)
+    *val = reply->str;
+    *vallen = reply->len;
+#else
     *val = zend_string_init(reply->str, reply->len, 0);
+#endif
 
     /* Clean up */
     cluster_free_reply(reply, 0);
@@ -650,10 +684,13 @@ PS_WRITE_FUNC(rediscluster) {
     short slot;
 
     /* Set up command and slot info */
+#if (PHP_MAJOR_VERSION < 7)
+    skey = cluster_session_key(c, key, strlen(key), &skeylen, &slot);
+    cmdlen = redis_cmd_format_static(&cmd, "SETEX", "sds", skey, skeylen, INI_INT("session.gc_maxlifetime"), val, vallen);
+#else
     skey = cluster_session_key(c, key->val, key->len, &skeylen, &slot);
-    cmdlen = redis_cmd_format_static(&cmd, "SETEX", "sds", skey, skeylen,
-                                     INI_INT("session.gc_maxlifetime"),
-                                     val->val, val->len);
+    cmdlen = redis_cmd_format_static(&cmd, "SETEX", "sds", skey, skeylen, INI_INT("session.gc_maxlifetime"), val->val, val->len);
+#endif
     efree(skey);
 
     /* Attempt to send command */
@@ -689,7 +726,11 @@ PS_DESTROY_FUNC(rediscluster) {
     short slot;
 
     /* Set up command and slot info */
+#if (PHP_MAJOR_VERSION < 7)
+    skey = cluster_session_key(c, key, strlen(key), &skeylen, &slot);
+#else
     skey = cluster_session_key(c, key->val, key->len, &skeylen, &slot);
+#endif
     cmdlen = redis_cmd_format_static(&cmd, "DEL", "s", skey, skeylen);
     efree(skey);
 
@@ -706,7 +747,7 @@ PS_DESTROY_FUNC(rediscluster) {
     reply = cluster_read_resp(c TSRMLS_CC);
     if (!reply || c->err) {
         if (reply) cluster_free_reply(reply, 1);
-        return FAILURE;
+        return FAILURE; 
     }
 
     /* Clean up our reply */
@@ -732,13 +773,6 @@ PS_CLOSE_FUNC(rediscluster)
 PS_GC_FUNC(rediscluster) {
     return SUCCESS;
 }
-
-ps_module ps_mod_redis = {
-    PS_MOD(redis)
-};
-ps_module ps_mod_redis_cluster = {
-    PS_MOD(rediscluster)
-};
 
 #endif
 

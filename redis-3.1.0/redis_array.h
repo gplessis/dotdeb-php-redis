@@ -8,7 +8,7 @@
 #endif
 #include "common.h"
 
-void redis_destructor_redis_array(zend_resource *rsrc TSRMLS_DC);
+void redis_destructor_redis_array(zend_resource * rsrc TSRMLS_DC);
 
 PHP_METHOD(RedisArray, __construct);
 PHP_METHOD(RedisArray, __call);
@@ -48,8 +48,8 @@ typedef struct RedisArray_ {
 	zend_bool index;		/* use per-node index */
 	zend_bool auto_rehash; 	/* migrate keys on read operations */
 	zend_bool pconnect;     /* should we use pconnect */
-	zval z_fun;			/* key extractor, callable */
-	zval z_dist;			/* key distributor, callable */
+	zval z_fun;             /* key extractor, callable */
+	zval z_dist;            /* key distributor, callable */
 	zval z_pure_cmds;		/* hash table */
 	double connect_timeout; /* socket connect timeout */
 

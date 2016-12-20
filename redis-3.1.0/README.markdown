@@ -1,5 +1,7 @@
 # PhpRedis
 
+[![Build Status](https://travis-ci.org/phpredis/phpredis.svg?branch=develop)](https://travis-ci.org/phpredis/phpredis)
+
 The phpredis extension provides an API for communicating with the [Redis](http://redis.io/) key-value store. It is released under the [PHP License, version 3.01](http://www.php.net/license/3_01.txt).
 This code has been developed and maintained by Owlient from November 2009 to March 2011.
 
@@ -23,6 +25,7 @@ You can send comments, patches, questions [here on github](https://github.com/ph
    * [Lists](#lists)
    * [Sets](#sets)
    * [Sorted sets](#sorted-sets)
+   * [Geocoding](#geocoding)
    * [Pub/sub](#pubsub)
    * [Transactions](#transactions)
    * [Scripting](#scripting)
@@ -98,7 +101,7 @@ phpredis can also connect to a unix domain socket: `session.save_path = "unix://
 
 ## Building on Windows
 
-See [instructions from @char101](https://github.com/nicolasff/phpredis/issues/213#issuecomment-11361242) on how to build phpredis on Windows.
+See [instructions from @char101](https://github.com/phpredis/phpredis/issues/213#issuecomment-11361242) on how to build phpredis on Windows.
 
 
 ## Distributed Redis Array
@@ -246,7 +249,7 @@ persistent equivalents.
 $redis->pconnect('127.0.0.1', 6379);
 $redis->pconnect('127.0.0.1'); // port 6379 by default - same connection like before.
 $redis->pconnect('127.0.0.1', 6379, 2.5); // 2.5 sec timeout and would be another connection than the two before.
-$redis->pconnect('127.0.0.1', 6379, 2.5, 'x'); // x is sent as persistent_id and would be another connection the the three before.
+$redis->pconnect('127.0.0.1', 6379, 2.5, 'x'); // x is sent as persistent_id and would be another connection than the three before.
 $redis->pconnect('/tmp/redis.sock'); // unix domain socket - would be another connection than the four before.
 ~~~
 
@@ -355,21 +358,21 @@ _**Description**_: Sends a string to Redis, which replies with the same string
 
 ## Server
 
-1. [bgrewriteaof](#bgrewriteaof) - Asynchronously rewrite the append-only file
-1. [bgsave](#bgsave) - Asynchronously save the dataset to disk (in background)
+1. [bgRewriteAOF](#bgrewriteaof) - Asynchronously rewrite the append-only file
+1. [bgSave](#bgsave) - Asynchronously save the dataset to disk (in background)
 1. [config](#config) - Get or Set the Redis server configuration parameters
 1. [dbSize](#dbsize) - Return the number of keys in selected database
 1. [flushAll](#flushall) - Remove all keys from all databases
-1. [flushDB](#flushdb) - Remove all keys from the current database
+1. [flushDb](#flushdb) - Remove all keys from the current database
 1. [info](#info) - Get information and statistics about the server
 1. [lastSave](#lastsave) - Get the timestamp of the last disk save
 1. [resetStat](#resetstat) - Reset the stats returned by [info](#info) method.
 1. [save](#save) - Synchronously save the dataset to disk (wait to complete)
-1. [slaveof](#slaveof) - Make the server a slave of another instance, or promote it to master
+1. [slaveOf](#slaveof) - Make the server a slave of another instance, or promote it to master
 1. [time](#time) - Return the current server time
-1. [slowlog](#slowlog) - Access the Redis slowlog entries
+1. [slowLog](#slowlog) - Access the Redis slowLog entries
 
-### bgrewriteaof
+### bgRewriteAOF
 -----
 _**Description**_: Start the background rewrite of AOF (Append-Only File)
 
@@ -381,10 +384,10 @@ None.
 
 ##### *Example*
 ~~~
-$redis->bgrewriteaof();
+$redis->bgRewriteAOF();
 ~~~
 
-### bgsave
+### bgSave
 -----
 _**Description**_: Asynchronously save the dataset to disk (in background)
 
@@ -449,7 +452,7 @@ None.
 $redis->flushAll();
 ~~~
 
-### flushDB
+### flushDb
 -----
 _**Description**_: Remove all keys from the current database.
 
@@ -461,7 +464,7 @@ None.
 
 ##### *Example*
 ~~~
-$redis->flushDB();
+$redis->flushDb();
 ~~~
 
 ### info
@@ -552,7 +555,7 @@ None.
 $redis->save();
 ~~~
 
-### slaveof
+### slaveOf
 -----
 _**Description**_: Changes the slave status
 
@@ -564,9 +567,9 @@ Either host (string) and port (int), or no parameter to stop being a slave.
 
 ##### *Example*
 ~~~
-$redis->slaveof('10.0.1.7', 6379);
+$redis->slaveOf('10.0.1.7', 6379);
 /* ... */
-$redis->slaveof();
+$redis->slaveOf();
 ~~~
 
 ### time
@@ -585,9 +588,9 @@ the unix timestamp, and element one being microseconds.
 $redis->time();
 ~~~
 
-### slowlog
+### slowLog
 -----
-_**Description**_: Access the Redis slowlog
+_**Description**_: Access the Redis slowLog
 
 ##### *Parameters*
 *Operation* (string): This can be either `GET`, `LEN`, or `RESET`
@@ -596,23 +599,23 @@ _**Description**_: Access the Redis slowlog
 
 ##### *Return value*
 The return value of SLOWLOG will depend on which operation was performed.
-SLOWLOG GET: Array of slowlog entries, as provided by Redis
-SLOGLOG LEN: Integer, the length of the slowlog
+SLOWLOG GET: Array of slowLog entries, as provided by Redis
+SLOGLOG LEN: Integer, the length of the slowLog
 SLOWLOG RESET: Boolean, depending on success
 #####
 
 ##### *Examples*
 ~~~
-// Get ten slowlog entries
-$redis->slowlog('get', 10);
-// Get the default number of slowlog entries
+// Get ten slowLog entries
+$redis->slowLog('get', 10);
+// Get the default number of slowLog entries
 
-$redis->slowlog('get');
-// Reset our slowlog
-$redis->slowlog('reset');
+$redis->slowLog('get');
+// Reset our slowLog
+$redis->slowLog('reset');
 
-// Retrieve slowlog length
-$redis->slowlog('len');
+// Retrieve slowLog length
+$redis->slowLog('len');
 ~~~
 
 ## Keys and Strings
@@ -621,8 +624,8 @@ $redis->slowlog('len');
 -----
 
 * [append](#append) - Append a value to a key
-* [bitcount](#bitcount) - Count set bits in a string
-* [bitop](#bitop) - Perform bitwise operations between strings
+* [bitCount](#bitcount) - Count set bits in a string
+* [bitOp](#bitop) - Perform bitwise operations between strings
 * [decr, decrBy](#decr-decrby) - Decrement the value of a key
 * [get](#get) - Get the value of a key
 * [getBit](#getbit) - Returns the bit value at offset in the string value stored at key
@@ -634,10 +637,10 @@ $redis->slowlog('len');
 * [mSet, mSetNX](#mset-msetnx) - Set multiple keys to multiple values
 * [set](#set) - Set the string value of a key
 * [setBit](#setbit) - Sets or clears the bit at offset in the string value stored at key
-* [setex, psetex](#setex-psetex) - Set the value and expiration of a key
-* [setnx](#setnx) - Set the value of a key, only if the key does not exist
+* [setEx, pSetEx](#setex-psetex) - Set the value and expiration of a key
+* [setNx](#setnx) - Set the value of a key, only if the key does not exist
 * [setRange](#setrange) - Overwrite part of a string at key starting at the specified offset
-* [strlen](#strlen) - Get the length of the value stored in a key
+* [strLen](#strlen) - Get the length of the value stored in a key
 
 ### Keys
 -----
@@ -707,7 +710,7 @@ $redis->set('key', 'value', Array('xx', 'px'=>1000));
 
 ~~~
 
-### setex, psetex
+### setEx, pSetEx
 -----
 _**Description**_: Set the string value in argument as value of the key, with a time to live. PSETEX uses a TTL in milliseconds.
 
@@ -722,11 +725,11 @@ _**Description**_: Set the string value in argument as value of the key, with a 
 ##### *Examples*
 
 ~~~
-$redis->setex('key', 3600, 'value'); // sets key → value, with 1h TTL.
-$redis->psetex('key', 100, 'value'); // sets key → value, with 0.1 sec TTL.
+$redis->setEx('key', 3600, 'value'); // sets key → value, with 1h TTL.
+$redis->pSetEx('key', 100, 'value'); // sets key → value, with 0.1 sec TTL.
 ~~~
 
-### setnx
+### setNx
 -----
 _**Description**_: Set the string value in argument as value of the key if the key doesn't already exist in the database.
 
@@ -739,8 +742,8 @@ _**Description**_: Set the string value in argument as value of the key if the k
 
 ##### *Examples*
 ~~~
-$redis->setnx('key', 'value'); /* return TRUE */
-$redis->setnx('key', 'value'); /* return FALSE */
+$redis->setNx('key', 'value'); /* return TRUE */
+$redis->setNx('key', 'value'); /* return FALSE */
 ~~~
 
 ### del, delete
@@ -862,7 +865,7 @@ $redis->set('key1', 'value1');
 $redis->set('key2', 'value2');
 $redis->set('key3', 'value3');
 $redis->mGet(array('key1', 'key2', 'key3')); /* array('value1', 'value2', 'value3');
-$redis->mGet(array('key0', 'key1', 'key5')); /* array(`FALSE`, 'value2', `FALSE`);
+$redis->mGet(array('key0', 'key1', 'key5')); /* array(`FALSE`, 'value1', `FALSE`);
 ~~~
 
 ### getSet
@@ -1120,7 +1123,7 @@ $redis->setRange('key', 6, "redis"); /* returns 11 */
 $redis->get('key'); /* "Hello redis" */
 ~~~
 
-### strlen
+### strLen
 -----
 _**Description**_: Get the length of a string value.
 
@@ -1174,7 +1177,7 @@ $redis->setBit('key', 7, 1); /* returns 0 */
 $redis->get('key'); /* chr(0x2f) = "/" = b("0010 1111") */
 ~~~
 
-### bitop
+### bitOp
 -----
 _**Description**_: Bitwise operation on multiple keys.
 
@@ -1187,7 +1190,7 @@ _**Description**_: Bitwise operation on multiple keys.
 ##### *Return value*
 *LONG*: The size of the string stored in the destination key.
 
-### bitcount
+### bitCount
 -----
 _**Description**_: Count bits in a string.
 
@@ -1218,11 +1221,11 @@ An array of values, or a number corresponding to the number of elements stored i
 ##### *Example*
 ~~~
 $redis->delete('s');
-$redis->sadd('s', 5);
-$redis->sadd('s', 4);
-$redis->sadd('s', 2);
-$redis->sadd('s', 1);
-$redis->sadd('s', 3);
+$redis->sAdd('s', 5);
+$redis->sAdd('s', 4);
+$redis->sAdd('s', 2);
+$redis->sAdd('s', 1);
+$redis->sAdd('s', 3);
 
 var_dump($redis->sort('s')); // 1,2,3,4,5
 var_dump($redis->sort('s', array('sort' => 'desc'))); // 5,4,3,2,1
@@ -1262,7 +1265,7 @@ _**Description**_: Remove the expiration timer from a key.
 $redis->persist('key');
 ~~~
 
-### mset, msetnx
+### mSet, mSetNx
 -----
 _**Description**_: Sets multiple key-value pairs in one atomic command. MSETNX only returns TRUE if all the keys were set (see SETNX).
 
@@ -1275,7 +1278,7 @@ _**Description**_: Sets multiple key-value pairs in one atomic command. MSETNX o
 ##### *Example*
 ~~~
 
-$redis->mset(array('key0' => 'value0', 'key1' => 'value1'));
+$redis->mSet(array('key0' => 'value0', 'key1' => 'value1'));
 var_dump($redis->get('key0'));
 var_dump($redis->get('key1'));
 
@@ -1421,10 +1424,12 @@ $redis->hLen('h'); /* returns 2 */
 _**Description**_: Removes a value from the hash stored at key. If the hash table doesn't exist, or the key doesn't exist, `FALSE` is returned.
 ##### *Parameters*
 *key*
-*hashKey*
+*hashKey1*
+*hashKey2*
+...
 
 ##### *Return value*
-*BOOL* `TRUE` in case of success, `FALSE` in case of failure
+*LONG* the number of deleted keys, 0 if the key doesn't exist, `FALSE` if the key isn't a hash.
 
 
 ### hKeys
@@ -1576,7 +1581,7 @@ _**Description**_: Increments the value of a hash member by the provided float v
 ~~~
 $redis->delete('h');
 $redis->hIncrByFloat('h','x', 1.5); /* returns 1.5: h[x] = 1.5 now */
-$redis->hIncrByFLoat('h', 'x', 1.5); /* returns 3.0: h[x] = 3.0 now */
+$redis->hIncrByFloat('h', 'x', 1.5); /* returns 3.0: h[x] = 3.0 now */
 $redis->hIncrByFloat('h', 'x', -3.0); /* returns 0.0: h[x] = 0.0 now */
 ~~~
 
@@ -1591,7 +1596,7 @@ _**Description**_: Fills in a whole hash. Non-string values are converted to str
 ##### *Examples*
 ~~~
 $redis->delete('user:1');
-$redis->hMset('user:1', array('name' => 'Joe', 'salary' => 2000));
+$redis->hMSet('user:1', array('name' => 'Joe', 'salary' => 2000));
 $redis->hIncrBy('user:1', 'salary', 100); // Joe earns 100 more now.
 ~~~
 
@@ -1608,7 +1613,7 @@ _**Description**_: Retrieve the values associated to the specified fields in the
 $redis->delete('h');
 $redis->hSet('h', 'field1', 'value1');
 $redis->hSet('h', 'field2', 'value2');
-$redis->hmGet('h', array('field1', 'field2')); /* returns array('field1' => 'value1', 'field2' => 'value2') */
+$redis->hMGet('h', array('field1', 'field2')); /* returns array('field1' => 'value1', 'field2' => 'value2') */
 ~~~
 
 ### hScan
@@ -1627,7 +1632,7 @@ _**Description**_:  Scan a HASH value for members, with an optional pattern and 
 $it = NULL;
 /* Don't ever return an empty array until we're done iterating */
 $redis->setOption(Redis::OPT_SCAN, Redis::SCAN_RETRY);
-while($arr_keys = $redis->hscan('hash', $it)) {
+while($arr_keys = $redis->hScan('hash', $it)) {
     foreach($arr_keys as $str_field => $str_value) {
         echo "$str_field => $str_value\n"; /* Print the hash member and value */
     }
@@ -1637,7 +1642,7 @@ while($arr_keys = $redis->hscan('hash', $it)) {
 ## Lists
 
 * [blPop, brPop](#blpop-brpop) - Remove and get the first/last element in a list
-* [brpoplpush](#brpoplpush) - Pop a value from a list, push it to another list and return it
+* [bRPopLPush](#brpoplpush) - Pop a value from a list, push it to another list and return it
 * [lIndex, lGet](#lindex-lget) - Get an element from a list by its index
 * [lInsert](#linsert) - Insert an element before or after another element in a list
 * [lLen, lSize](#llen-lsize) - Get the length/size of a list
@@ -1649,9 +1654,9 @@ while($arr_keys = $redis->hscan('hash', $it)) {
 * [lSet](#lset) - Set the value of an element in a list by its index
 * [lTrim, listTrim](#ltrim-listtrim) - Trim a list to the specified range
 * [rPop](#rpop) - Remove and get the last element in a list
-* [rpoplpush](#rpoplpush) - Remove the last element in a list, append it to another list and return it (redis >= 1.1)
+* [rPopLPush](#rpoplpush) - Remove the last element in a list, append it to another list and return it (redis >= 1.1)
 * [rPush](#rpush) - Append one or multiple values to a list
-* [rPushx](#rpushx) - Append a value to a list, only if the list exists
+* [rPushX](#rpushx) - Append a value to a list, only if the list exists
 
 ### blPop, brPop
 -----
@@ -1700,9 +1705,9 @@ $redis->lPush('key1', 'A');
 /* array('key1', 'A') is returned*/
 ~~~
 
-### brpoplpush
+### bRPopLPush
 -----
-_**Description**_: A blocking version of `rpoplpush`, with an integral timeout in the third parameter.
+_**Description**_: A blocking version of `rPopLPush`, with an integral timeout in the third parameter.
 
 ##### *Parameters*
 *Key*: srckey
@@ -1738,7 +1743,7 @@ $redis->lGet('key1', 0); /* 'A' */
 $redis->lGet('key1', -1); /* 'C' */
 $redis->lGet('key1', 10); /* `FALSE` */
 ~~~
-
+/
 ### lInsert
 -----
 _**Description**_: Insert value in the list before or after the pivot value.
@@ -1947,7 +1952,7 @@ $redis->rPush('key1', 'C'); /* key1 => [ 'A', 'B', 'C' ] */
 $redis->rPop('key1'); /* key1 => [ 'A', 'B' ] */
 ~~~
 
-### rpoplpush
+### rPopLPush
 -----
 _**Description**_: Pops a value from the tail of a list, and pushes it to the front of another list. Also return this value. (redis >= 1.1)
 
@@ -1968,7 +1973,7 @@ $redis->lPush('y', '123');
 $redis->lPush('y', '456');
 
 // move the last of x to the front of y.
-var_dump($redis->rpoplpush('x', 'y'));
+var_dump($redis->rPopLPush('x', 'y'));
 var_dump($redis->lRange('x', 0, -1));
 var_dump($redis->lRange('y', 0, -1));
 
@@ -2010,7 +2015,7 @@ $redis->rPush('key1', 'C'); // returns 3
 /* key1 now points to the following list: [ 'A', 'B', 'C' ] */
 ~~~
 
-### rPushx
+### rPushX
 -----
 _**Description**_: Adds the string value to the tail (right) of the list if the ist exists. `FALSE` in case of Failure.
 
@@ -2024,10 +2029,10 @@ _**Description**_: Adds the string value to the tail (right) of the list if the 
 ##### *Examples*
 ~~~
 $redis->delete('key1');
-$redis->rPushx('key1', 'A'); // returns 0
+$redis->rPushX('key1', 'A'); // returns 0
 $redis->rPush('key1', 'A'); // returns 1
-$redis->rPushx('key1', 'B'); // returns 2
-$redis->rPushx('key1', 'C'); // returns 3
+$redis->rPushX('key1', 'B'); // returns 2
+$redis->rPushX('key1', 'C'); // returns 3
 /* key1 now points to the following list: [ 'A', 'B', 'C' ] */
 ~~~
 
@@ -2488,7 +2493,7 @@ _**Description**_: Scan a set for members
 ~~~
 $it = NULL;
 $redis->setOption(Redis::OPT_SCAN, Redis::SCAN_RETRY); /* don't return empty results until we're done */
-while($arr_mems = $redis->sscan('set', $it, "*pattern*")) {
+while($arr_mems = $redis->sScan('set', $it, "*pattern*")) {
     foreach($arr_mems as $str_mem) {
         echo "Member: $str_mem\n";
     }
@@ -2496,7 +2501,7 @@ while($arr_mems = $redis->sscan('set', $it, "*pattern*")) {
 
 $it = NULL;
 $redis->setOption(Redis::OPT_SCAN, Redis::SCAN_NORETRY); /* return after each iteration, even if empty */
-while(($arr_mems = $redis->sscan('set', $it, "*pattern*"))!==FALSE) {
+while(($arr_mems = $redis->sScan('set', $it, "*pattern*"))!==FALSE) {
     if(count($arr_mems) > 0) {
         foreach($arr_mems as $str_mem) {
             echo "Member found: $str_mem\n";
@@ -2905,7 +2910,7 @@ _**Description**_: Scan a sorted set for members, with optional pattern and coun
 ~~~
 $it = NULL;
 $redis->setOption(Redis::OPT_SCAN, Redis::SCAN_RETRY);
-while($arr_matches = $redis->zscan('zset', $it, '*pattern*')) {
+while($arr_matches = $redis->zScan('zset', $it, '*pattern*')) {
     foreach($arr_matches as $str_mem => $f_score) {
         echo "Key: $str_mem, Score: $f_score\n";
     }
@@ -2914,12 +2919,12 @@ while($arr_matches = $redis->zscan('zset', $it, '*pattern*')) {
 
 ## Pub/sub
 
-* [psubscribe](#psubscribe) - Subscribe to channels by pattern
+* [pSubscribe](#psubscribe) - Subscribe to channels by pattern
 * [publish](#publish) - Post a message to a channel
 * [subscribe](#subscribe) - Subscribe to channels
-* [pubsub](#pubsub) - Introspection into the pub/sub subsystem
+* [pubSub](#pubsub) - Introspection into the pub/sub subsystem
 
-### psubscribe
+### pSubscribe
 -----
 _**Description**_: Subscribe to channels by pattern
 
@@ -2929,7 +2934,7 @@ _**Description**_: Subscribe to channels by pattern
 *return value*: Mixed.  Any non-null return value in the callback will be returned to the caller.
 ##### *Example*
 ~~~
-function psubscribe($redis, $pattern, $chan, $msg) {
+function pSubscribe($redis, $pattern, $chan, $msg) {
 	echo "Pattern: $pattern\n";
 	echo "Channel: $chan\n";
 	echo "Payload: $msg\n";
@@ -2978,7 +2983,7 @@ function f($redis, $chan, $msg) {
 $redis->subscribe(array('chan-1', 'chan-2', 'chan-3'), 'f'); // subscribe to 3 chans
 ~~~
 
-### pubsub
+### pubSub
 -----
 _**Description**_: A command allowing you to get information on the Redis pub/sub system.
 
@@ -2993,10 +2998,40 @@ _**Description**_: A command allowing you to get information on the Redis pub/su
 
 ##### *Example*
 ~~~
-$redis->pubsub("channels"); /*All channels */
-$redis->pubsub("channels", "*pattern*"); /* Just channels matching your pattern */
-$redis->pubsub("numsub", Array("chan1", "chan2")); /*Get subscriber counts for 'chan1' and 'chan2'*/
-$redsi->pubsub("numpat"); /* Get the number of pattern subscribers */
+$redis->pubSub("channels"); /*All channels */
+$redis->pubSub("channels", "*pattern*"); /* Just channels matching your pattern */
+$redis->pubSub("numsub", Array("chan1", "chan2")); /*Get subscriber counts for 'chan1' and 'chan2'*/
+$redis->pubSub("numpat"); /* Get the number of pattern subscribers */
+
+
+~~~
+
+## Generic
+1. [rawCommand](#rawcommand) - Execute any generic command against the server.
+
+### rawCommand
+-----
+_**Description**_: A method to execute any arbitrary command against the a Redis server
+
+##### *Parameters*
+This method is variadic and takes a dynamic number of arguments of various types (string, long, double), but must be passed at least one argument (the command keyword itself).
+
+##### *Return value*
+The return value can be various types depending on what the server itself returns.   No post processing is done to the returned value and must be handled by the client code.
+
+##### *Example*
+```php
+/* Returns: true */
+$redis->rawCommand("set", "foo", "bar"); 
+
+/* Returns: "bar" */
+$redis->rawCommand("get", "foo"); 
+
+/* Returns: 3 */
+$redis->rawCommand("rpush", "mylist", "one", 2, 3.5)); 
+
+/* Returns: ["one", "2", "3.5000000000000000"] */
+$redis->rawCommand("lrange", "mylist", 0, -1);
 ```
 
 ## Transactions
@@ -3258,7 +3293,7 @@ $redis->_unserialize('a:3:{i:0;i:1;i:1;i:2;i:2;i:3;}'); // Will return Array(1,2
 
 ## Introspection
 
-### IsConnected
+### isConnected
 -----
 _**Description**_:  A method to determine if a phpredis object thinks it's connected to a server
 
@@ -3268,7 +3303,7 @@ None
 ##### *Return value*
 *Boolean* Returns TRUE if phpredis thinks it's connected and FALSE if not
 
-### GetHost
+### getHost
 -----
 _**Description**_:  Retreive our host or unix socket that we're connected to
 
@@ -3279,7 +3314,7 @@ None
 *Mixed* The host or unix socket we're connected to or FALSE if we're not connected
 
 
-### GetPort
+### getPort
 -----
 _**Description**_:  Get the port we're connected to
 
@@ -3289,7 +3324,7 @@ None
 ##### *Return value*
 *Mixed* Returns the port we're connected to or FALSE if we're not connected
 
-### getDBNum
+### getDbNum
 -----
 _**Description**_:  Get the database number phpredis is pointed to
 
@@ -3299,7 +3334,7 @@ None
 ##### *Return value*
 *Mixed* Returns the database number (LONG) phpredis thinks it's pointing to or FALSE if we're not connected
 
-### GetTimeout
+### getTimeout
 -----
 _**Description**_:  Get the (write) timeout in use for phpredis
 
@@ -3309,7 +3344,7 @@ None
 ##### *Return value*
 *Mixed* The timeout (DOUBLE) specified in our connect call or FALSE if we're not connected
 
-### GetReadTimeout
+### getReadTimeout
 _**Description**_:  Get the read timeout specified to phpredis or FALSE if we're not connected
 
 ##### *Parameters*
@@ -3318,7 +3353,7 @@ None
 ##### *Return value*
 *Mixed*  Returns the read timeout (which can be set using setOption and Redis::OPT_READ_TIMEOUT) or FALSE if we're not connected
 
-### GetPersistentID
+### getPersistentID
 -----
 _**Description**_:  Gets the persistent ID that phpredis is using
 
@@ -3329,7 +3364,7 @@ None
 *Mixed* Returns the persistent id phpredis is using (which will only be set if connected with pconnect), NULL if we're not
 using a persistent ID, and FALSE if we're not connected
 
-### GetAuth
+### getAuth
 -----
 _**Description**_:  Get the password used to authenticate the phpredis connection
 

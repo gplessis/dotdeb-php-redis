@@ -1,18 +1,6 @@
 #ifndef REDIS_COMMANDS_H
 #define REDIS_COMMANDS_H
 
-#if defined(_MSC_VER) && _MSC_VER >= 1900
-# if defined(HAVE_GETTIMEOFDAY)
-#  include <time.h>
-   struct timezone 
-   {
-    int tz_minuteswest; /* minutes W of Greenwich */
-    int tz_dsttime;     /* type of dst correction */
-   };
-   int gettimeofday(struct timeval *tv, struct timezone *tz);
-# endif
-#endif
-
 #include "common.h"
 #include "library.h"
 #include "cluster_library.h"
@@ -32,6 +20,21 @@ typedef struct subscribeContext {
     zend_fcall_info cb;
     zend_fcall_info_cache cb_cache;
 } subscribeContext;
+
+/* Georadius sort type */
+typedef enum geoSortType {
+    SORT_NONE,
+    SORT_ASC,
+    SORT_DESC
+} geoSortType;
+
+/* GEORADIUS and GEORADIUSBYMEMBER options */
+/*typedef struct geoRadiusOpts = {
+    int withcoord;
+    int withdist;
+    int withhash;
+    geoSortType sort;
+};*/
 
 /* Construct a raw command */
 int redis_build_raw_cmd(zval *z_args, int argc, char **cmd, int *cmd_len TSRMLS_DC);
@@ -56,7 +59,7 @@ int redis_kv_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
     char *kw, char **cmd, int *cmd_len, short *slot, void **ctx);
 
 int redis_key_str_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
-    char *kw, char **cmd, int *cmd_len, short *slot, void **ctx);
+    char *kw, char **cmd, int *cmd_len, short *slot, void **ctx);     
 
 int redis_key_key_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
     char *kw, char **cmd, int *cmd_len, short *slot, void **ctx);
@@ -91,11 +94,11 @@ typedef int (*zrange_cb)(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
                          char *,char**,int*,int*,short*,void**);
 
 int redis_zrange_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
-    char *kw, char **cmd, int *cmd_len, int *withscores, short *slot,
+    char *kw, char **cmd, int *cmd_len, int *withscores, short *slot, 
     void **ctx);
 
 int redis_zrangebyscore_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
-    char *kw, char **cmd, int *cmd_len, int *withscores, short *slot,
+    char *kw, char **cmd, int *cmd_len, int *withscores, short *slot, 
     void **ctx);
 
 int redis_zinter_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
@@ -114,7 +117,7 @@ int redis_gen_zlex_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
     char *kw, char **cmd, int *cmd_len, short *slot, void **ctx);
 
 /* Commands which need a unique construction mechanism.  This is either because
- * they don't share a signature with any other command, or because there is
+ * they don't share a signature with any other command, or because there is 
  * specific processing we do (e.g. verifying subarguments) that make them
  * unique */
 
@@ -142,7 +145,7 @@ int redis_hmget_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
 int redis_hmset_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
     char **cmd, int *cmd_len, short *slot, void **ctx);
 
-int redis_bitop_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
+int redis_bitop_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock, 
     char **cmd, int *cmd_len, short *slot, void **ctx);
 
 int redis_bitcount_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
@@ -236,22 +239,31 @@ int redis_command_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
 int redis_fmt_scan_cmd(char **cmd, REDIS_SCAN_TYPE type, char *key, int key_len,
                        long it, char *pat, int pat_len, long count);
 
-/* Commands that don't communicate with Redis at all (such as getOption,
+int redis_geodist_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
+    char **cmd, int *cmd_len, short *slot, void **ctx);
+
+int redis_georadius_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
+    char **cmd, int *cmd_len, short *slot, void **ctx);
+
+int redis_georadiusbymember_cmd(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
+    char **cmd, int *cmd_len, short *slot, void **ctx);
+
+/* Commands that don't communicate with Redis at all (such as getOption, 
  * setOption, _prefix, _serialize, etc).  These can be handled in one place
- * with the method of grabbing our RedisSock* object in different ways
+ * with the method of grabbing our RedisSock* object in different ways 
  * depending if this is a Redis object or a RedisCluster object. */
 
-void redis_getoption_handler(INTERNAL_FUNCTION_PARAMETERS,
+void redis_getoption_handler(INTERNAL_FUNCTION_PARAMETERS, 
     RedisSock *redis_sock, redisCluster *c);
-void redis_setoption_handler(INTERNAL_FUNCTION_PARAMETERS,
+void redis_setoption_handler(INTERNAL_FUNCTION_PARAMETERS, 
     RedisSock *redis_sock, redisCluster *c);
-void redis_prefix_handler(INTERNAL_FUNCTION_PARAMETERS,
+void redis_prefix_handler(INTERNAL_FUNCTION_PARAMETERS, 
     RedisSock *redis_sock);
-void redis_serialize_handler(INTERNAL_FUNCTION_PARAMETERS,
+void redis_serialize_handler(INTERNAL_FUNCTION_PARAMETERS, 
     RedisSock *redis_sock);
-void redis_unserialize_handler(INTERNAL_FUNCTION_PARAMETERS,
+void redis_unserialize_handler(INTERNAL_FUNCTION_PARAMETERS, 
     RedisSock *redis_sock, zend_class_entry *ex);
 
 #endif
 
-/* vim: set tabstop=4 softtabstops=4 noexpandtab shiftwidth=4: */
+/* vim: set tabstop=4 softtabstop=4 expandtab shiftwidth=4: */

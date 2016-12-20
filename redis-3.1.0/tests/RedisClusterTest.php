@@ -35,7 +35,7 @@ class Redis_Cluster_Test extends Redis_Test {
 
     /* Load our seeds on construction */
     public function __construct() {
-        $str_nodemap_file = dirname(dirname($_SERVER['PHP_SELF'])) . '/nodes/nodemap';
+        $str_nodemap_file = dirname($_SERVER['PHP_SELF']) . '/nodes/nodemap';
 
         if (!file_exists($str_nodemap_file)) {
             fprintf(STDERR, "Error:  Can't find nodemap file for seeds!\n");
@@ -73,6 +73,13 @@ class Redis_Cluster_Test extends Redis_Test {
     }
 
     public function testRandomKey() {
+        /* Ensure some keys are present to test */
+        for ($i = 0; $i < 1000; $i++) {
+            if (rand(1, 2) == 1) {
+                $this->redis->set("key:$i", "val:$i");
+            }
+        }
+
         for ($i = 0; $i < 1000; $i++) {
             $k = $this->redis->randomKey("key:$i");
             $this->assertTrue($this->redis->exists($k));
@@ -493,6 +500,11 @@ class Redis_Cluster_Test extends Redis_Test {
         $this->redis->del('mylist');
         $this->redis->rpush('mylist', 'A','B','C','D');
         $this->assertEquals($this->redis->lrange('mylist', 0, -1), Array('A','B','C','D'));
+    }
+
+    protected function rawCommandArray($key, $args) {
+        array_unshift($args, $key);
+        return call_user_func_array(Array($this->redis, 'rawCommand'), $args);
     }
 }
 ?>
