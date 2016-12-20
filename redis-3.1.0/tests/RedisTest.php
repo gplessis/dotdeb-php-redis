@@ -1,4 +1,4 @@
-<?php defined('PHPREDIS_TESTRUN') or die("Use TestRedis.php to run tests!\n"); 
+<?php defined('PHPREDIS_TESTRUN') or die("Use TestRedis.php to run tests!\n");
 
 require_once(dirname($_SERVER['PHP_SELF'])."/TestSuite.php");
 
@@ -6,6 +6,15 @@ class Redis_Test extends TestSuite
 {
     const PORT = 6379;
     const AUTH = NULL; //replace with a string to use Redis authentication
+
+    /* City lat/long */
+    protected $cities = Array(
+        'Chico'         => Array(-121.837478, 39.728494),
+        'Sacramento'    => Array(-121.494400, 38.581572),
+        'Gridley'       => Array(-121.693583, 39.363777),
+        'Marysville'    => Array(-121.591355, 39.145725),
+        'Cupertino'     => Array(-122.032182, 37.322998)
+    );
 
     /**
      * @var Redis
@@ -16,6 +25,10 @@ class Redis_Test extends TestSuite
         $this->redis = $this->newInstance();
         $info = $this->redis->info();
         $this->version = (isset($info['redis_version'])?$info['redis_version']:'0.0.0');
+    }
+
+    protected function minVersionCheck($version) {
+        return version_compare($this->version, $version, "ge");
     }
 
     protected function newInstance() {
@@ -154,8 +167,8 @@ class Redis_Test extends TestSuite
         // Verify valid offset ranges
         $this->assertFalse($this->redis->getBit('key', -1));
 
-        $this->redis->setBit('key', ((2^32)-1), 1);
-        $this->assertEquals(1, $this->redis->getBit('key', ((2^32)-1)));
+        $this->redis->setBit('key', 4294967295, 1);
+        $this->assertEquals(1, $this->redis->getBit('key', 4294967295));
     }
 
     public function testBitPos() {
@@ -443,6 +456,13 @@ class Redis_Test extends TestSuite
         $this->assertTrue($this->redis->ttl('key') ===7);
         $this->assertTrue($this->redis->get('key') === 'val');
     }
+    
+    public function testPSetEx() {
+        $this->redis->del('key');
+        $this->assertTrue($this->redis->psetex('key', 7 * 1000, 'val') === TRUE);
+        $this->assertTrue($this->redis->ttl('key') ===7);
+        $this->assertTrue($this->redis->get('key') === 'val');
+    }
 
     public function testSetNX() {
 
@@ -467,32 +487,35 @@ class Redis_Test extends TestSuite
         $this->redis->set('key', 0);
 
         $this->redis->incr('key');
-    $this->assertEquals(1, (int)$this->redis->get('key'));
+        $this->assertEquals(1, (int)$this->redis->get('key'));
 
         $this->redis->incr('key');
-    $this->assertEquals(2, (int)$this->redis->get('key'));
+        $this->assertEquals(2, (int)$this->redis->get('key'));
 
-    $this->redis->incrBy('key', 3);
-    $this->assertEquals(5, (int)$this->redis->get('key'));
+        $this->redis->incrBy('key', 3);
+        $this->assertEquals(5, (int)$this->redis->get('key'));
 
-    $this->redis->incrBy('key', 1);
-    $this->assertEquals(6, (int)$this->redis->get('key'));
+        $this->redis->incrBy('key', 1);
+        $this->assertEquals(6, (int)$this->redis->get('key'));
 
-    $this->redis->incrBy('key', -1);
-    $this->assertEquals(5, (int)$this->redis->get('key'));
+        $this->redis->incrBy('key', -1);
+        $this->assertEquals(5, (int)$this->redis->get('key'));
 
-    $this->redis->incr('key', 5);
-    $this->assertEquals(10, (int)$this->redis->get('key'));
+        $this->redis->incr('key', 5);
+        $this->assertEquals(10, (int)$this->redis->get('key'));
 
-    $this->redis->del('key');
+        $this->redis->del('key');
 
-    $this->redis->set('key', 'abc');
+        $this->redis->set('key', 'abc');
 
-    $this->redis->incr('key');
-    $this->assertTrue("abc" === $this->redis->get('key'));
+        $this->redis->incr('key');
+        $this->assertTrue("abc" === $this->redis->get('key'));
 
-    $this->redis->incr('key');
-    $this->assertTrue("abc" === $this->redis->get('key'));
+        $this->redis->incr('key');
+        $this->assertTrue("abc" === $this->redis->get('key'));
+
+        $this->redis->set('key', 0);
+        $this->assertEquals(2147483648, $this->redis->incrby('key', 2147483648));
     }
 
     public function testIncrByFloat()
@@ -590,32 +613,33 @@ class Redis_Test extends TestSuite
         $key = 'key' . rand();
         $this->redis->set($key, 'val');
         $this->assertEquals('val', $this->redis->get($key));
-        $this->assertEquals(1, $this->redis->del($key));
+    $this->assertEquals(1, $this->redis->del($key));
         $this->assertEquals(false, $this->redis->get($key));
 
-        // multiple, all existing
-        $this->redis->set('x', 0);
-        $this->redis->set('y', 1);
-        $this->redis->set('z', 2);
-        $this->assertEquals(3, $this->redis->del('x', 'y', 'z'));
-        $this->assertEquals(false, $this->redis->get('x'));
-        $this->assertEquals(false, $this->redis->get('y'));
-        $this->assertEquals(false, $this->redis->get('z'));
+    // multiple, all existing
+    $this->redis->set('x', 0);
+    $this->redis->set('y', 1);
+    $this->redis->set('z', 2);
+    $this->assertEquals(3, $this->redis->del('x', 'y', 'z'));
+    $this->assertEquals(false, $this->redis->get('x'));
+    $this->assertEquals(false, $this->redis->get('y'));
+    $this->assertEquals(false, $this->redis->get('z'));
 
-        // multiple, none existing
-        $this->assertEquals(0, $this->redis->del('x', 'y', 'z'));
-        $this->assertEquals(false, $this->redis->get('x'));
-        $this->assertEquals(false, $this->redis->get('y'));
-        $this->assertEquals(false, $this->redis->get('z'));
+    // multiple, none existing
+    $this->assertEquals(0, $this->redis->del('x', 'y', 'z'));
+    $this->assertEquals(false, $this->redis->get('x'));
+    $this->assertEquals(false, $this->redis->get('y'));
+    $this->assertEquals(false, $this->redis->get('z'));
 
-        // multiple, some existing
-        $this->redis->set('y', 1);
-        $this->assertEquals(1, $this->redis->del('x', 'y', 'z'));
-        $this->assertEquals(false, $this->redis->get('y'));
+    // multiple, some existing
+    $this->redis->set('y', 1);
+    $this->assertEquals(1, $this->redis->del('x', 'y', 'z'));
+    $this->assertEquals(false, $this->redis->get('y'));
 
-        $this->redis->set('x', 0);
-        $this->redis->set('y', 1);
-        $this->assertEquals(2, $this->redis->del(array('x', 'y')));
+    $this->redis->set('x', 0);
+    $this->redis->set('y', 1);
+    $this->assertEquals(2, $this->redis->del(array('x', 'y')));
+
     }
 
     public function testType()
@@ -962,7 +986,7 @@ class Redis_Test extends TestSuite
     // sort by age and get IDs
     $byAgeDesc = array('4','2','1','3');
     $this->assertEquals($byAgeDesc, $this->redis->sortDesc('person:id', 'person:age_*'));
-    
+
     // sort by age and get names
     $byAgeDesc = array('Dave', 'Bob', 'Alice', 'Carol');
     $this->assertEquals($byAgeDesc, $this->redis->sortDesc('person:id', 'person:age_*', 'person:name_*'));
@@ -1919,7 +1943,7 @@ class Redis_Test extends TestSuite
 
     public function testZAddFirstArg() {
 
-        $this->redis->del('100');
+        $this->redis->del('key');
 
         $zsetName = 100; // not a string!
         $this->assertTrue(1 === $this->redis->zAdd($zsetName, 0, 'val0'));
@@ -1936,9 +1960,15 @@ class Redis_Test extends TestSuite
 
         $this->assertTrue(1 === $this->redis->zAdd('key', 0, 'val0'));
         $this->assertTrue(1 === $this->redis->zAdd('key', 2, 'val2'));
-        $this->assertTrue(1 === $this->redis->zAdd('key', 1, 'val1'));
-        $this->assertTrue(1 === $this->redis->zAdd('key', 3, 'val3'));
         $this->assertTrue(2 === $this->redis->zAdd('key', 4, 'val4', 5, 'val5')); // multiple parameters
+        if (version_compare($this->version, "3.0.2", "lt")) {
+            $this->assertTrue(1 === $this->redis->zAdd('key', 1, 'val1'));
+            $this->assertTrue(1 === $this->redis->zAdd('key', 3, 'val3'));
+        } else {
+            $this->assertTrue(1 === $this->redis->zAdd('key', array(), 1, 'val1')); // empty options
+            $this->assertTrue(1 === $this->redis->zAdd('key', array('nx'), 3, 'val3')); // nx option
+            $this->assertTrue(0 === $this->redis->zAdd('key', array('xx'), 3, 'val3')); // xx option
+        }
 
         $this->assertTrue(array('val0', 'val1', 'val2', 'val3', 'val4', 'val5') === $this->redis->zRange('key', 0, -1));
 
@@ -2266,6 +2296,8 @@ class Redis_Test extends TestSuite
         $this->assertTrue(3 === $this->redis->hIncrBy('h', 'x', 1));
         $this->assertTrue(2 === $this->redis->hIncrBy('h', 'x', -1));
         $this->assertTrue("2" === $this->redis->hGet('h', 'x'));
+        $this->assertTrue(1000000000002 === $this->redis->hIncrBy('h', 'x', 1000000000000));
+        $this->assertTrue("1000000000002" === $this->redis->hGet('h', 'x'));
 
         $this->redis->hSet('h', 'y', 'not-a-number');
         $this->assertTrue(FALSE === $this->redis->hIncrBy('h', 'y', 1));
@@ -2276,6 +2308,7 @@ class Redis_Test extends TestSuite
             $this->assertTrue(1.5 === $this->redis->hIncrByFloat('h','x', 1.5));
             $this->assertTrue(3.0 === $this->redis->hincrByFloat('h','x', 1.5));
             $this->assertTrue(1.5 === $this->redis->hincrByFloat('h','x', -1.5));
+            $this->assertTrue(1000000000001.5 === $this->redis->hincrByFloat('h','x', 1000000000000));
 
             $this->redis->hset('h','y','not-a-number');
             $this->assertTrue(FALSE === $this->redis->hIncrByFloat('h', 'y', 1.5));
@@ -2394,7 +2427,6 @@ class Redis_Test extends TestSuite
 
     public function testMultiExec() {
         $this->sequence(Redis::MULTI);
-        
         $this->differentType(Redis::MULTI);
 
         // with prefix as well
@@ -2414,7 +2446,7 @@ class Redis_Test extends TestSuite
 
     public function testFailedTransactions() {
         $this->redis->set('x', 42);
-    
+
         // failed transaction
         $this->redis->watch('x');
 
@@ -2455,7 +2487,7 @@ class Redis_Test extends TestSuite
             ->type('x')
             ->get('x')
             ->exec();
-        
+
         $this->assertTrue(is_array($ret));
         $i = 0;
         $this->assertTrue($ret[$i++] == TRUE);
@@ -2484,7 +2516,7 @@ class Redis_Test extends TestSuite
             ->decrby('{key}2', 5)
             ->get('{key}2')
             ->exec();
-        
+
         $i = 0;
         $this->assertTrue(is_array($ret));
         $this->assertTrue(is_long($ret[$i++]));
@@ -2508,7 +2540,7 @@ class Redis_Test extends TestSuite
         $this->assertTrue(count($ret) == $i);
 
         $this->redis->setOption(Redis::OPT_SERIALIZER, $serializer);
-        
+
         $ret = $this->redis->multi($mode)
             ->del('{key}1')
             ->del('{key}2')
@@ -2518,7 +2550,7 @@ class Redis_Test extends TestSuite
             ->exists('{key}1')
             ->exists('{key}3')
             ->exec();
-        
+
         $this->assertTrue(is_array($ret));
         $this->assertTrue($ret[0] == TRUE);
         $this->assertTrue($ret[1] == TRUE);
@@ -2539,7 +2571,7 @@ class Redis_Test extends TestSuite
             ->ttl('key')
             ->expireAt('key', '0000')
             ->exec();
-        
+
         $this->assertTrue(is_array($ret));
         $i = 0;
         $ttl = $ret[$i++];
@@ -4754,6 +4786,168 @@ class Redis_Test extends TestSuite
                 $this->redis->del('pf-merge-{key}');
             }
         }
+    }
+
+    //
+    // GEO* command tests
+    //
+
+    protected function rawCommandArray($key, $args) {
+        return call_user_func_array(Array($this->redis, 'rawCommand'), $args);
+    }
+
+    protected function addCities($key) {
+        $this->redis->del($key);
+        foreach ($this->cities as $city => $longlat) {
+            $this->redis->geoadd($key, $longlat[0], $longlat[1], $city);
+        }
+    }
+
+    /* GEOADD */
+    public function testGeoAdd() {
+        if (!$this->minVersionCheck("3.2")) {
+            return $this->markTestSkipped();
+        }
+
+        $this->redis->del('geokey');
+
+        /* Add them one at a time */
+        foreach ($this->cities as $city => $longlat) {
+            $this->assertEquals($this->redis->geoadd('geokey', $longlat[0], $longlat[1], $city), 1);
+        }
+
+        /* Add them again, all at once */
+        $args = Array('geokey');
+        foreach ($this->cities as $city => $longlat) {
+            $args = array_merge($args, Array($longlat[0], $longlat[1], $city));
+        }
+
+        /* They all exist, should be nothing added */
+        $this->assertEquals(call_user_func_array(Array($this->redis, 'geoadd'), $args), 0);
+    }
+
+    /* GEORADIUS */
+    public function genericGeoRadiusTest($cmd) {
+        if (!$this->minVersionCheck("3.2.0")) {
+            return $this->markTestSkipped();
+        }
+
+        /* Chico */
+        $city = 'Chico';
+        $lng = -121.837478;
+        $lat = 39.728494;
+
+        $this->addCities('gk');
+
+        /* Pre tested with redis-cli.  We're just verifying proper delivery of distance and unit */
+        if ($cmd == 'georadius') {
+            $this->assertEquals($this->redis->georadius('gk', $lng, $lat, 10, 'mi'), Array('Chico'));
+            $this->assertEquals($this->redis->georadius('gk', $lng, $lat, 30, 'mi'), Array('Gridley','Chico'));
+            $this->assertEquals($this->redis->georadius('gk', $lng, $lat, 50, 'km'), Array('Gridley','Chico'));
+            $this->assertEquals($this->redis->georadius('gk', $lng, $lat, 50000, 'm'), Array('Gridley','Chico'));
+            $this->assertEquals($this->redis->georadius('gk', $lng, $lat, 150000, 'ft'), Array('Gridley', 'Chico'));
+            $args = Array('georadius', 'gk', $lng, $lat, 500, 'mi');
+        } else {
+            $this->assertEquals($this->redis->georadiusbymember('gk', $city, 10, 'mi'), Array('Chico'));
+            $this->assertEquals($this->redis->georadiusbymember('gk', $city, 30, 'mi'), Array('Gridley','Chico'));
+            $this->assertEquals($this->redis->georadiusbymember('gk', $city, 50, 'km'), Array('Gridley','Chico'));
+            $this->assertEquals($this->redis->georadiusbymember('gk', $city, 50000, 'm'), Array('Gridley','Chico'));
+            $this->assertEquals($this->redis->georadiusbymember('gk', $city, 150000, 'ft'), Array('Gridley', 'Chico'));
+            $args = Array('georadiusbymember', 'gk', $city, 500, 'mi');
+        }
+
+        /* Options */
+        $opts = Array('WITHCOORD', 'WITHDIST', 'WITHHASH');
+        $sortopts = Array('', 'ASC', 'DESC');
+
+        for ($i = 0; $i < count($opts); $i++) {
+            $subopts = array_slice($opts, 0, $i);
+            shuffle($subopts);
+
+            $subargs = $args;
+            foreach ($subopts as $opt) {
+                $subargs[] = $opt;
+            }
+
+            for ($c = 0; $c < 3; $c++) {
+                /* Add a count if we're past first iteration */
+                if ($c > 0) {
+                    $subopts['count'] = $c;
+                    $subargs[] = 'count';
+                    $subargs[] = $c;
+                }
+
+                /* Adding optional sort */
+                foreach ($sortopts as $sortopt) {
+                    $realargs = $subargs;
+                    $realopts = $subopts;
+                    if ($sortopt) {
+                        $realargs[] = $sortopt;
+                        $realopts[] = $sortopt;
+                    }
+
+                    $ret1 = $this->rawCommandArray('gk', $realargs);
+                    if ($cmd == 'georadius') {
+                        $ret2 = $this->redis->$cmd('gk', $lng, $lat, 500, 'mi', $realopts);
+                    } else {
+                        $ret2 = $this->redis->$cmd('gk', $city, 500, 'mi', $realopts);
+                    }
+                    $this->assertEquals($ret1, $ret2);
+                }
+            }
+        }
+    }
+
+    public function testGeoRadius() {
+        if (!$this->minVersionCheck("3.2.0")) {
+            return $this->markTestSkipped();
+        }
+
+        $this->genericGeoRadiusTest('georadius');
+    }
+
+    public function testGeoRadiusByMember() {
+        if (!$this->minVersionCheck("3.2.0")) {
+            return $this->markTestSkipped();
+        }
+
+        $this->genericGeoRadiusTest('georadiusbymember');
+    }
+
+    public function testGeoPos() {
+        if (!$this->minVersionCheck("3.2.0")) {
+            return $this->markTestSkipped();
+        }
+
+        $this->addCities('gk');
+        $this->assertEquals($this->redis->geopos('gk', 'Chico', 'Sacramento'), $this->rawCommandArray('gk', Array('geopos', 'gk', 'Chico', 'Sacramento')));
+        $this->assertEquals($this->redis->geopos('gk', 'Cupertino'), $this->rawCommandArray('gk', Array('geopos', 'gk', 'Cupertino')));
+    }
+
+    public function testGeoHash() {
+        if (!$this->minVersionCheck("3.2.0")) {
+            return $this->markTestSkipped();
+        }
+
+        $this->addCities('gk');
+        $this->assertEquals($this->redis->geohash('gk', 'Chico', 'Sacramento'), $this->rawCommandArray('gk', Array('geohash', 'gk', 'Chico', 'Sacramento')));
+        $this->assertEquals($this->redis->geohash('gk', 'Chico'), $this->rawCommandArray('gk', Array('geohash', 'gk', 'Chico')));
+    }
+
+    public function testGeoDist() {
+        if (!$this->minVersionCheck("3.2.0")) {
+            return $this->markTestSkipped();
+        }
+
+        $this->addCities('gk');
+
+        $r1 = $this->redis->geodist('gk', 'Chico', 'Cupertino');
+        $r2 = $this->rawCommandArray('gk', Array('geodist', 'gk', 'Chico', 'Cupertino'));
+        $this->assertEquals(round($r1, 8), round($r2, 8));
+
+        $r1 = $this->redis->geodist('gk', 'Chico', 'Cupertino', 'km');
+        $r2 = $this->rawCommandArray('gk', Array('geodist', 'gk', 'Chico', 'Cupertino', 'km'));
+        $this->assertEquals(round($r1, 8), round($r2, 8));
     }
 
     /* Test a 'raw' command */

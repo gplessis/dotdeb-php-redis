@@ -44,7 +44,7 @@ class Redis_Array_Test extends TestSuite
         foreach($this->strings as $k => $v) {
             $this->assertTrue($v === $this->ra->get($k));
         }
-        
+
         // check each key individually using a new connection
         foreach($this->strings as $k => $v) {
             parseHostPort($this->ra->_target($k), $host, $port);
@@ -199,12 +199,14 @@ class Redis_Rehashing_Test extends TestSuite
         }
     }
 
+
     private function distributeKeys() {
+
         // strings
         foreach($this->strings as $k => $v) {
             $this->ra->set($k, $v);
         }
-
+        
         // sets
         foreach($this->sets as $k => $v) {
             call_user_func_array(array($this->ra, 'sadd'), array_merge(array($k), $v));
@@ -214,12 +216,12 @@ class Redis_Rehashing_Test extends TestSuite
         foreach($this->lists as $k => $v) {
             call_user_func_array(array($this->ra, 'rpush'), array_merge(array($k), $v));
         }
-        
+
         // hashes
         foreach($this->hashes as $k => $v) {
             $this->ra->hmset($k, $v);
         }
-
+        
         // sorted sets
         foreach($this->zsets as $k => $v) {
             call_user_func_array(array($this->ra, 'zadd'), array_merge(array($k), $v));
@@ -235,6 +237,7 @@ class Redis_Rehashing_Test extends TestSuite
     }
 
     private function readAllvalues() {
+
         // strings
         foreach($this->strings as $k => $v) {
             $this->assertTrue($this->ra->get($k) === $v);
@@ -256,13 +259,13 @@ class Redis_Rehashing_Test extends TestSuite
             $ret = $this->ra->lrange($k, 0, -1);
             $this->assertTrue($ret == $v);
         }
-        
+
         // hashes
         foreach($this->hashes as $k => $v) {
             $ret = $this->ra->hgetall($k); // get values
             $this->assertTrue($ret == $v);
         }
-        
+
         // sorted sets
         foreach($this->zsets as $k => $v) {
             $ret = $this->ra->zrange($k, 0, -1, TRUE); // get values with scores
@@ -280,6 +283,7 @@ class Redis_Rehashing_Test extends TestSuite
 
     // add a new node.
     public function testCreateSecondRing() {
+
         global $newRing, $oldRing, $serverList;
         $oldRing = $newRing; // back up the original.
         $newRing = $serverList; // add a new node to the main ring.
@@ -293,15 +297,14 @@ class Redis_Rehashing_Test extends TestSuite
         $this->ra->_rehash(); // this will redistribute the keys
     }
 
-    
     public function testRehashWithCallback() {
         $total = 0;
         $this->ra->_rehash(function ($host, $count) use (&$total) {
             $total += $count;
-      });
-      $this->assertTrue($total > 0);
+        });
+        $this->assertTrue($total > 0);
     }
-    
+
     public function testReadRedistributedKeys() {
         $this->readAllvalues(); // we shouldn't have any missed reads now.
     }
