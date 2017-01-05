@@ -1,3 +1,10 @@
+php-redis (3.1.0-1~dotdeb+8.3) stable; urgency=medium
+
+  [ Guillaume Plessis ]
+  * Fix a segfault with igbinary, take #2
+
+ -- Guillaume Plessis <gui@dotdeb.org>  Thu, 05 Jan 2017 01:51:42 +0000
+
 php-redis (3.1.0-1~dotdeb+8.2) stable; urgency=medium
 
   [ Guillaume Plessis ]
