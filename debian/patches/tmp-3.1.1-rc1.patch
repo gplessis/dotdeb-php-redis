@@ -438,6 +438,15 @@ Index: dotdeb-php-redis/redis-3.1.0/redis.c
      strlen_t host_len, persistent_id_len;
      double timeout = 0.0;
      RedisSock *redis_sock  = NULL;
+@@ -784,7 +799,7 @@ PHP_REDIS_API int redis_connect(INTERNAL
+ #if (PHP_MAJOR_VERSION < 7)
+             zend_list_delete(Z_LVAL_P(socket));
+ #else
+-            zend_list_delete(Z_RES_P(socket));
++            zend_list_close(Z_RES_P(socket));
+ #endif
+         }
+     }
 @@ -1007,7 +1022,7 @@ PHP_METHOD(Redis, getMultiple)
      ZEND_HASH_FOREACH_VAL(hash, z_ele) {
          zend_string *zstr = zval_get_string(z_ele);
