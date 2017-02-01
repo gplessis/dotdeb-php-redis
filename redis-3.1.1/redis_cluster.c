@@ -227,7 +227,7 @@ zend_function_entry redis_cluster_functions[] = {
     PHP_ME(RedisCluster, geodist, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(RedisCluster, georadius, NULL, ZEND_ACC_PUBLIC)
     PHP_ME(RedisCluster, georadiusbymember, NULL, ZEND_ACC_PUBLIC)
-    {NULL, NULL, NULL}
+    PHP_FE_END
 };
 
 /* Our context seeds will be a hash table with RedisSock* pointers */
@@ -585,11 +585,13 @@ typedef struct clusterKeyValHT {
     char kbuf[22];
 
     char  *key;
-    int   key_len, key_free;
+    strlen_t key_len;
+    int key_free;
     short slot;
 
     char *val;
-    int  val_len, val_free;
+    strlen_t val_len;
+    int val_free;
 } clusterKeyValHT;
 
 /* Helper to pull a key/value pair from a HashTable */
@@ -1050,7 +1052,7 @@ PHP_METHOD(RedisCluster, keys) {
     }
 
     /* Prefix and then build our command */
-    pat_free = redis_key_prefix(c->flags, &pat, (int *)&pat_len);
+    pat_free = redis_key_prefix(c->flags, &pat, &pat_len);
     cmd_len = redis_cmd_format_static(&cmd, "KEYS", "s", pat, pat_len);
     if(pat_free) efree(pat);
 
@@ -1899,7 +1901,8 @@ static void cluster_eval_cmd(INTERNAL_FUNCTION_PARAMETERS, redisCluster *c,
 {
     redisClusterNode *node=NULL;
     char *lua, *key;
-    int key_free, args_count=0, key_len;
+    int key_free, args_count=0;
+    strlen_t key_len;
     zval *z_arr=NULL, *z_ele;
     HashTable *ht_arr;
     zend_long num_keys = 0;
@@ -2136,7 +2139,7 @@ PHP_METHOD(RedisCluster, watch) {
     smart_string cmd = {0};
     zval *z_args;
     int argc = ZEND_NUM_ARGS(), i;
-    ulong slot;
+    zend_ulong slot;
     zend_string *zstr;
 
     // Disallow in MULTI mode
@@ -2306,7 +2309,8 @@ PHP_METHOD(RedisCluster, discard) {
 static short
 cluster_cmd_get_slot(redisCluster *c, zval *z_arg TSRMLS_DC) 
 {
-    int key_len, key_free;
+    strlen_t key_len;
+    int key_free;
     zval *z_host, *z_port;
     short slot;
     char *key;
@@ -2499,7 +2503,7 @@ static void cluster_kscan_cmd(INTERNAL_FUNCTION_PARAMETERS,
     }
 
     // Apply any key prefix we have, get the slot
-    key_free = redis_key_prefix(c->flags, &key, (int *)&key_len);
+    key_free = redis_key_prefix(c->flags, &key, &key_len);
     slot = cluster_hash_key(key, key_len);
 
     // If SCAN_RETRY is set, loop until we get a zero iterator or until
@@ -2714,7 +2718,7 @@ PHP_METHOD(RedisCluster, info) {
     REDIS_REPLY_TYPE rtype;
     char *cmd, *opt=NULL;
     int cmd_len;
-    strlen_t opt_len;
+    strlen_t opt_len = 0;
     void *ctx = NULL;
     zval *z_arg;
     short slot;
@@ -2766,7 +2770,7 @@ PHP_METHOD(RedisCluster, client) {
     redisCluster *c = GET_CONTEXT();
     char *cmd, *opt=NULL, *arg=NULL;
     int cmd_len;
-    strlen_t opt_len, arg_len;
+    strlen_t opt_len, arg_len = 0;
     REDIS_REPLY_TYPE rtype;
     zval *z_node;
     short slot;
