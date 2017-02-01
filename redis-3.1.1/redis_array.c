@@ -89,7 +89,7 @@ zend_function_entry redis_array_functions[] = {
      /* Aliases */
      PHP_MALIAS(RedisArray, delete, del, NULL, ZEND_ACC_PUBLIC)
      PHP_MALIAS(RedisArray, getMultiple, mget, NULL, ZEND_ACC_PUBLIC)
-     {NULL, NULL, NULL}
+     PHP_FE_END
 };
 
 static void redis_array_free(RedisArray *ra) {
@@ -551,8 +551,8 @@ PHP_METHOD(RedisArray, _rehash)
 {
 	zval *object;
 	RedisArray *ra;
-	zend_fcall_info z_cb;
-	zend_fcall_info_cache z_cb_cache;
+	zend_fcall_info z_cb = {0};
+	zend_fcall_info_cache z_cb_cache = {0};
 
 	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O|f",
 				&object, redis_array_ce, &z_cb, &z_cb_cache) == FAILURE) {

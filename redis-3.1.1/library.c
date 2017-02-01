@@ -33,6 +33,19 @@
     # endif
 #endif
 
+#if (PHP_MAJOR_VERSION < 7)
+    int (*_add_next_index_string)(zval *, const char *, int) = &add_next_index_string;
+    int (*_add_next_index_stringl)(zval *, const char *, uint, int) = &add_next_index_stringl;
+    int (*_add_assoc_bool_ex)(zval *, const char *, uint, int) = &add_assoc_bool_ex;
+    int (*_add_assoc_long_ex)(zval *, const char *, uint, long) = &add_assoc_long_ex;
+    int (*_add_assoc_double_ex)(zval *, const char *, uint, double) = &add_assoc_double_ex;
+    int (*_add_assoc_string_ex)(zval *, const char *, uint, char *, int) = &add_assoc_string_ex;
+    int (*_add_assoc_stringl_ex)(zval *, const char *, uint, char *, uint, int) = &add_assoc_stringl_ex;
+    int (*_add_assoc_zval_ex)(zval *, const char *, uint, zval *) = &add_assoc_zval_ex;
+    void (*_php_var_serialize)(smart_str *, zval **, php_serialize_data_t * TSRMLS_DC) = &php_var_serialize;
+    int (*_php_var_unserialize)(zval **, const unsigned char **, const unsigned char *, php_unserialize_data_t * TSRMLS_DC) = &php_var_unserialize;
+#endif
+
 extern zend_class_entry *redis_ce;
 extern zend_class_entry *redis_exception_ce;
 
@@ -203,7 +216,7 @@ PHP_REDIS_API int redis_check_eof(RedisSock *redis_sock, int no_throw TSRMLS_DC)
 
 PHP_REDIS_API int
 redis_sock_read_scan_reply(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
-                           REDIS_SCAN_TYPE type, long *iter)
+                           REDIS_SCAN_TYPE type, zend_long *iter)
 {
     REDIS_REPLY_TYPE reply_type;
     long reply_info;
@@ -297,7 +310,7 @@ PHP_REDIS_API int redis_subscribe_response(INTERNAL_FUNCTION_PARAMETERS,
 
     /* Multibulk response, {[pattern], type, channel, payload } */
     while(1) {
-        zval *z_type, *z_chan, *z_pat, *z_data;
+        zval *z_type, *z_chan, *z_pat = NULL, *z_data;
         HashTable *ht_tab;
         int tab_idx=1, is_pmsg;
 
@@ -483,6 +496,7 @@ PHP_REDIS_API char *redis_sock_read(RedisSock *redis_sock, int *buf_len TSRMLS_D
     char inbuf[1024];
     size_t err_len;
 
+    *buf_len = 0;
     if(-1 == redis_check_eof(redis_sock, 0 TSRMLS_CC)) {
         return NULL;
     }
@@ -1103,36 +1117,20 @@ redis_boolean_response_impl(INTERNAL_FUNCTION_PARAMETERS, RedisSock *redis_sock,
 
     char *response;
     int response_len;
-    char ret;
+    zend_bool ret = 0;
 
-    if ((response = redis_sock_read(redis_sock, &response_len TSRMLS_CC)) == NULL) {
-        IF_MULTI_OR_PIPELINE() {
-            add_next_index_bool(z_tab, 0);
-            return;
-        }
-        RETURN_FALSE;
+    if ((response = redis_sock_read(redis_sock, &response_len TSRMLS_CC)) != NULL) {
+        ret = (*response == '+');
+        efree(response);
     }
-    ret = response[0];
-    efree(response);
 
+    if (ret && success_callback != NULL) {
+        success_callback(redis_sock);
+    }
     IF_MULTI_OR_PIPELINE() {
-        if (ret == '+') {
-            if (success_callback != NULL) {
-                success_callback(redis_sock);
-            }
-            add_next_index_bool(z_tab, 1);
-        } else {
-            add_next_index_bool(z_tab, 0);
-        }
+        add_next_index_bool(z_tab, ret);
     } else {
-        if (ret == '+') {
-            if (success_callback != NULL) {
-                success_callback(redis_sock);
-            }
-            RETURN_TRUE;
-        } else {
-            RETURN_FALSE;
-        }
+        RETURN_BOOL(ret);
     }
 }
 
@@ -1682,10 +1680,7 @@ PHP_REDIS_API void redis_send_discard(INTERNAL_FUNCTION_PARAMETERS,
 
     cmd_len = redis_cmd_format_static(&cmd, "DISCARD", "");
 
-    if (redis_sock_write(redis_sock, cmd, cmd_len TSRMLS_CC) < 0) {
-        efree(cmd);
-        RETURN_FALSE;
-    }
+    SOCKET_WRITE_COMMAND(redis_sock, cmd, cmd_len)
     efree(cmd);
 
     if ((response = redis_sock_read(redis_sock, &response_len TSRMLS_CC)) 
@@ -1922,18 +1917,18 @@ PHP_REDIS_API int redis_mbulk_reply_assoc(INTERNAL_FUNCTION_PARAMETERS, RedisSoc
 /**
  * redis_sock_write
  */
-PHP_REDIS_API int redis_sock_write(RedisSock *redis_sock, char *cmd, size_t sz 
-                            TSRMLS_DC)
+PHP_REDIS_API int
+redis_sock_write(RedisSock *redis_sock, char *cmd, size_t sz TSRMLS_DC)
 {
     if (!redis_sock || redis_sock->status == REDIS_SOCK_STATUS_DISCONNECTED) {
         zend_throw_exception(redis_exception_ce, "Connection closed", 
             0 TSRMLS_CC);
-        return -1;
+    } else if (redis_check_eof(redis_sock, 0 TSRMLS_CC) == 0 &&
+               php_stream_write(redis_sock->stream, cmd, sz) == sz
+    ) {
+        return sz;
     }
-    if(-1 == redis_check_eof(redis_sock, 0 TSRMLS_CC)) {
-        return -1;
-    }
-    return php_stream_write(redis_sock->stream, cmd, sz);
+    return -1;
 }
 
 /**
@@ -1958,7 +1953,7 @@ PHP_REDIS_API void redis_free_socket(RedisSock *redis_sock)
 }
 
 PHP_REDIS_API int
-redis_serialize(RedisSock *redis_sock, zval *z, char **val, int *val_len 
+redis_serialize(RedisSock *redis_sock, zval *z, char **val, strlen_t *val_len
                 TSRMLS_DC) 
 {
 #if ZEND_MODULE_API_NO >= 20100000
@@ -2010,7 +2005,7 @@ redis_serialize(RedisSock *redis_sock, zval *z, char **val, int *val_len
             php_var_serialize(&sstr, z, &ht);
 #if (PHP_MAJOR_VERSION < 7)
             *val = estrndup(sstr.c, sstr.len);
-            *val_len = (int)sstr.len;
+            *val_len = sstr.len;
 #else
             *val = estrndup(sstr.s->val, sstr.s->len);
             *val_len = sstr.s->len;
@@ -2028,7 +2023,7 @@ redis_serialize(RedisSock *redis_sock, zval *z, char **val, int *val_len
 #ifdef HAVE_REDIS_IGBINARY
             if(igbinary_serialize(&val8, (size_t *)&sz, z TSRMLS_CC) == 0) {
                 *val = (char*)val8;
-                *val_len = (int)sz;
+                *val_len = sz;
                 return 1;
             }
 #endif
@@ -2087,14 +2082,16 @@ redis_unserialize(RedisSock* redis_sock, const char *val, int val_len,
             {
                 /* This is most definitely not an igbinary string, so do
                    not try to unserialize this as one. */
-                return 0;
+                break;
             }
 
-            if(igbinary_unserialize((const uint8_t *)val, (size_t)val_len, 
-                                    z_ret TSRMLS_CC) == 0
-            ) {
-                ret = 1;
-            }
+#if (PHP_MAJOR_VERSION < 7)
+            INIT_PZVAL(z_ret);
+            ret = !igbinary_unserialize((const uint8_t *)val, (size_t)val_len, &z_ret TSRMLS_CC);
+#else
+            ret = !igbinary_unserialize((const uint8_t *)val, (size_t)val_len, z_ret TSRMLS_CC);
+#endif
+
 #endif
             break;
     }
@@ -2102,7 +2099,7 @@ redis_unserialize(RedisSock* redis_sock, const char *val, int val_len,
 }
 
 PHP_REDIS_API int
-redis_key_prefix(RedisSock *redis_sock, char **key, int *key_len) {
+redis_key_prefix(RedisSock *redis_sock, char **key, strlen_t *key_len) {
     int ret_len;
     char *ret;
 
