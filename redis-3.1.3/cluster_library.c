@@ -649,7 +649,7 @@ cluster_node_create(redisCluster *c, char *host, size_t host_len,
 
     // Attach socket
     node->sock = redis_sock_create(host, host_len, port, c->timeout,
-        c->persistent, NULL, 0, 1);
+        c->read_timeout, c->persistent, NULL, 0, 1);
 
     return node;
 }
@@ -916,7 +916,7 @@ cluster_init_seeds(redisCluster *cluster, HashTable *ht_seeds) {
         // Allocate a structure for this seed
         redis_sock = redis_sock_create(str, psep-str,
             (unsigned short)atoi(psep+1), cluster->timeout,
-            cluster->persistent, NULL, 0, 0);
+            cluster->read_timeout, cluster->persistent, NULL, 0, 0);
 
         // Index this seed by host/port
         key_len = snprintf(key, sizeof(key), "%s:%u", redis_sock->host,
@@ -1034,7 +1034,7 @@ static int cluster_check_response(redisCluster *c, REDIS_REPLY_TYPE *reply_type
 
     // In the event of an ERROR, check if it's a MOVED/ASK error
     if(*reply_type == TYPE_ERR) {
-        char inbuf[1024];
+        char inbuf[4096];
         int moved;
 
         // Attempt to read the error
@@ -1870,7 +1870,11 @@ PHP_REDIS_API void cluster_variant_resp(INTERNAL_FUNCTION_PARAMETERS, redisClust
                 RETVAL_TRUE;
                 break;
             case TYPE_BULK:
-                RETVAL_STRINGL(r->str, r->len);
+                if (r->len < 0) {
+                    RETVAL_NULL();
+                } else {
+                    RETVAL_STRINGL(r->str, r->len);
+                }
                 break;
             case TYPE_MULTIBULK:
                 array_init(z_arr);
@@ -1896,8 +1900,12 @@ PHP_REDIS_API void cluster_variant_resp(INTERNAL_FUNCTION_PARAMETERS, redisClust
                 add_next_index_bool(&c->multi_resp, 1);
                 break;
             case TYPE_BULK:
-                add_next_index_stringl(&c->multi_resp, r->str, r->len);
-                efree(r->str);
+                if (r->len < 0) {
+                    add_next_index_null(&c->multi_resp);
+                } else {
+                    add_next_index_stringl(&c->multi_resp, r->str, r->len);
+                    efree(r->str);
+                }
                 break;
             case TYPE_MULTIBULK:
                 cluster_mbulk_variant_resp(r, &c->multi_resp);
@@ -2028,7 +2036,7 @@ PHP_REDIS_API void cluster_info_resp(INTERNAL_FUNCTION_PARAMETERS, redisCluster 
 
     // Return our array
     if(CLUSTER_IS_ATOMIC(c)) {
-        RETVAL_ZVAL(z_result, 1, 0);
+        RETVAL_ZVAL(z_result, 0, 1);
     } else {
         add_next_index_zval(&c->multi_resp, z_result);
     }
